@@ -49,7 +49,7 @@ init_db()
 
 # Gemini API設定
 import os
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "REPLACE_WITH_ENV_VAR"))
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 HEADERS = {
