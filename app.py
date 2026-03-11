@@ -1,0 +1,368 @@
+import json
+import re
+from urllib.parse import urlparse, urljoin
+
+import google.generativeai as genai
+import requests
+from bs4 import BeautifulSoup
+from flask import Flask, jsonify, render_template, request
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+# Gemini API設定
+import os
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "REPLACE_WITH_ENV_VAR"))
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+TIMEOUT = 10
+
+
+def fetch_page(url):
+    """サイトのHTMLを取得"""
+    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    resp.raise_for_status()
+    resp.encoding = resp.apparent_encoding or "utf-8"
+    return resp.text
+
+
+def check_robots_txt(base_url):
+    """robots.txtからAIボットのアクセス状況を確認"""
+    robots_url = urljoin(base_url, "/robots.txt")
+    try:
+        resp = requests.get(robots_url, headers=HEADERS, timeout=TIMEOUT)
+        if resp.status_code != 200:
+            return {"exists": False, "content": "", "bots": {}}
+        content = resp.text
+        bots = {}
+        for bot in ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "Googlebot"]:
+            # 各ボットのAllow/Disallow状況を解析
+            bot_section = False
+            rules = []
+            for line in content.split("\n"):
+                line = line.strip()
+                if line.lower().startswith("user-agent:"):
+                    agent = line.split(":", 1)[1].strip()
+                    bot_section = agent == bot or agent == "*"
+                elif bot_section and line.lower().startswith(("allow:", "disallow:")):
+                    rules.append(line)
+                elif line == "" and bot_section and rules:
+                    break
+            # ボット名で専用セクションがあるか再チェック
+            has_specific = any(
+                line.strip().lower() == f"user-agent: {bot.lower()}"
+                for line in content.split("\n")
+            )
+            if has_specific:
+                specific_rules = []
+                in_section = False
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line.lower() == f"user-agent: {bot.lower()}":
+                        in_section = True
+                    elif in_section and line.lower().startswith("user-agent:"):
+                        break
+                    elif in_section and line.lower().startswith(("allow:", "disallow:")):
+                        specific_rules.append(line)
+                bots[bot] = {
+                    "has_specific_rules": True,
+                    "rules": specific_rules,
+                    "blocked": any("disallow: /" == r.lower().strip() for r in specific_rules),
+                }
+            else:
+                bots[bot] = {
+                    "has_specific_rules": False,
+                    "rules": [],
+                    "blocked": False,
+                }
+        return {"exists": True, "content": content[:2000], "bots": bots}
+    except Exception:
+        return {"exists": False, "content": "", "bots": {}}
+
+
+def check_llms_txt(base_url):
+    """llms.txtの有無を確認"""
+    try:
+        resp = requests.get(urljoin(base_url, "/llms.txt"), headers=HEADERS, timeout=TIMEOUT)
+        if resp.status_code == 200 and len(resp.text.strip()) > 0:
+            return {"exists": True, "content": resp.text[:2000]}
+        return {"exists": False, "content": ""}
+    except Exception:
+        return {"exists": False, "content": ""}
+
+
+def extract_structured_data(soup):
+    """JSON-LD構造化データを抽出"""
+    scripts = soup.find_all("script", type="application/ld+json")
+    data = []
+    for s in scripts:
+        try:
+            parsed = json.loads(s.string)
+            data.append(parsed)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return data
+
+
+def extract_meta_info(soup):
+    """メタ情報を抽出"""
+    title = soup.title.string.strip() if soup.title and soup.title.string else ""
+    meta_desc = ""
+    og_title = ""
+    og_desc = ""
+    canonical = ""
+    tag = soup.find("meta", attrs={"name": "description"})
+    if tag and tag.get("content"):
+        meta_desc = tag["content"]
+    tag = soup.find("meta", attrs={"property": "og:title"})
+    if tag and tag.get("content"):
+        og_title = tag["content"]
+    tag = soup.find("meta", attrs={"property": "og:description"})
+    if tag and tag.get("content"):
+        og_desc = tag["content"]
+    tag = soup.find("link", attrs={"rel": "canonical"})
+    if tag and tag.get("href"):
+        canonical = tag["href"]
+    return {
+        "title": title,
+        "meta_description": meta_desc,
+        "og_title": og_title,
+        "og_description": og_desc,
+        "canonical": canonical,
+    }
+
+
+def extract_headings(soup):
+    """h1〜h3タグを抽出"""
+    headings = {}
+    for level in ["h1", "h2", "h3"]:
+        tags = soup.find_all(level)
+        headings[level] = [t.get_text(strip=True) for t in tags[:20]]
+    return headings
+
+
+def check_faq_content(soup, html):
+    """FAQ/Q&A形式のコンテンツがあるか確認"""
+    indicators = {
+        "has_faq_schema": False,
+        "has_qa_elements": False,
+        "has_faq_section": False,
+    }
+    # FAQ構造化データ
+    for s in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(s.string)
+            text = json.dumps(data).lower()
+            if "faqpage" in text or "question" in text:
+                indicators["has_faq_schema"] = True
+        except (json.JSONDecodeError, TypeError):
+            pass
+    # FAQ要素（details/summary, accordion的な構造）
+    if soup.find_all("details") or soup.find_all("summary"):
+        indicators["has_qa_elements"] = True
+    # FAQセクション
+    faq_pattern = re.compile(r"(よくある質問|FAQ|Q&A|質問と回答)", re.IGNORECASE)
+    if faq_pattern.search(html[:50000]):
+        indicators["has_faq_section"] = True
+    return indicators
+
+
+def analyze_with_gemini(site_data):
+    """Gemini APIで分析"""
+    prompt = f"""あなたはGEO（Generative Engine Optimization）の専門家です。
+以下のサイト情報を分析し、AI検索エンジン（ChatGPT、Claude、Perplexity、Gemini）に引用・参照されやすいサイトかを評価してください。
+
+## 分析対象サイト情報
+
+URL: {site_data['url']}
+
+### robots.txt
+存在: {site_data['robots']['exists']}
+AIボット状況: {json.dumps(site_data['robots']['bots'], ensure_ascii=False, indent=2)}
+
+### llms.txt
+存在: {site_data['llms_txt']['exists']}
+内容: {site_data['llms_txt']['content'][:500] if site_data['llms_txt']['exists'] else 'なし'}
+
+### 構造化データ（JSON-LD）
+{json.dumps(site_data['structured_data'][:5], ensure_ascii=False, indent=2) if site_data['structured_data'] else 'なし'}
+
+### メタ情報
+{json.dumps(site_data['meta'], ensure_ascii=False, indent=2)}
+
+### 見出し構造
+{json.dumps(site_data['headings'], ensure_ascii=False, indent=2)}
+
+### FAQ/Q&Aコンテンツ
+{json.dumps(site_data['faq'], ensure_ascii=False, indent=2)}
+
+## 評価基準と出力形式
+
+以下の5カテゴリで評価してください（各0〜100点）:
+
+1. **ai_crawler_access**（AIクローラーアクセス）: robots.txtでAIボットをブロックしていないか、適切にアクセスを許可しているか
+2. **llms_txt**（LLMs.txt対応）: llms.txtファイルが存在し、AI向けにサイト情報を提供しているか
+3. **structured_data**（構造化データ）: JSON-LDで適切な構造化データがマークアップされているか
+4. **content_citability**（引用されやすさ）: FAQ形式、明確な見出し構造、引用しやすいコンテンツ構造か
+5. **meta_optimization**（メタ情報最適化）: title、description、OGPが適切に設定されているか
+
+## 採点ルール
+- 辛口で採点すること（甘くしない）
+- overall_scoreは各カテゴリの加重平均（ai_crawler_access: 25%, llms_txt: 15%, structured_data: 25%, content_citability: 20%, meta_optimization: 15%）
+- gradeはoverall_scoreに基づく: 90〜=A+, 80〜89=A, 70〜79=B, 60〜69=C, 50〜59=D, 〜49=F
+
+必ず以下のJSON形式のみで回答してください（説明文なし、JSONのみ）:
+{{
+  "overall_score": 75,
+  "grade": "B",
+  "summary": "サイト全体の評価（2〜3文の日本語）",
+  "categories": {{
+    "ai_crawler_access": {{
+      "score": 80,
+      "title": "AIクローラーアクセス",
+      "status": "good",
+      "detail": "詳細説明（日本語）",
+      "recommendations": ["改善提案1", "改善提案2"]
+    }},
+    "llms_txt": {{
+      "score": 30,
+      "title": "LLMs.txt対応",
+      "status": "bad",
+      "detail": "詳細説明（日本語）",
+      "recommendations": ["改善提案1"]
+    }},
+    "structured_data": {{
+      "score": 60,
+      "title": "構造化データ",
+      "status": "warning",
+      "detail": "詳細説明（日本語）",
+      "recommendations": ["改善提案1"]
+    }},
+    "content_citability": {{
+      "score": 70,
+      "title": "引用されやすさ",
+      "status": "good",
+      "detail": "詳細説明（日本語）",
+      "recommendations": ["改善提案1"]
+    }},
+    "meta_optimization": {{
+      "score": 85,
+      "title": "メタ情報最適化",
+      "status": "good",
+      "detail": "詳細説明（日本語）",
+      "recommendations": ["改善提案1"]
+    }}
+  }},
+  "top_actions": [
+    {{ "priority": "high", "action": "具体的なアクション（日本語）" }},
+    {{ "priority": "medium", "action": "具体的なアクション（日本語）" }},
+    {{ "priority": "low", "action": "具体的なアクション（日本語）" }}
+  ],
+  "practical_guide": {{
+    "llms_txt_sample": "llms.txtが存在しない、または不十分な場合に、このサイト専用のllms.txtサンプルコードを生成してください。存在して十分な場合はnullにしてください。サイトのURL・構造・コンテンツを反映した実用的なものにしてください。",
+    "schema_suggestion": "構造化データ（JSON-LD）が不足している場合に、追加すべきJSON-LDのサンプルコードを生成してください。十分な場合はnullにしてください。サイトの内容に合ったFAQPage、Organization、WebSiteなどを提案してください。",
+    "faq_ideas": ["このサイトのテーマに合った、AIに引用されやすいFAQ案を3〜5個生成してください。サイト固有の内容を反映した具体的な質問にしてください。"],
+    "quick_wins": [
+      {{
+        "title": "今日できること（30分以内で完了する具体的タスク名）",
+        "steps": ["具体的な手順1（コピペで実行可能なレベルで）", "具体的な手順2"],
+        "impact": "high"
+      }}
+    ]
+  }}
+}}
+
+## practical_guideの生成ルール
+- llms_txt_sample: llms.txtが存在しない or 内容が薄い場合のみ生成。Markdownベースでサイト構造を反映したサンプルを書く。既にあって十分ならnullにする。
+- schema_suggestion: JSON-LDが不足している場合のみ生成。そのサイトに適した構造化データ（FAQPage、Organization、LocalBusiness等）のサンプルコードを書く。十分ならnullにする。
+- faq_ideas: 必ず3〜5個。サイトのテーマ・業種に合わせた具体的FAQ案。「〇〇とは？」のような一般的すぎるものは避け、サイト固有の質問にする。
+- quick_wins: 1〜3個。30分以内で実行可能な具体的タスク。stepsは実際にコピペで実行できるレベルの具体性。impactはhigh/medium/lowから選択。
+
+statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
+"""
+    response = model.generate_content(prompt)
+    text = response.text.strip()
+    # JSONブロックを抽出
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0].strip()
+    return json.loads(text)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze():
+    data = request.get_json()
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URLを入力してください"}), 400
+
+    # URLの正規化
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    parsed = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    try:
+        # 1. サイト取得
+        html = fetch_page(url)
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 2. robots.txtチェック
+        robots = check_robots_txt(base_url)
+
+        # 3. llms.txtチェック
+        llms_txt = check_llms_txt(base_url)
+
+        # 4. 構造化データ抽出
+        structured_data = extract_structured_data(soup)
+
+        # 5. メタ情報抽出
+        meta = extract_meta_info(soup)
+
+        # 6. 見出し構造抽出
+        headings = extract_headings(soup)
+
+        # 7. FAQ/Q&Aコンテンツ確認
+        faq = check_faq_content(soup, html)
+
+        # 収集データをまとめる
+        site_data = {
+            "url": url,
+            "robots": robots,
+            "llms_txt": llms_txt,
+            "structured_data": structured_data,
+            "meta": meta,
+            "headings": headings,
+            "faq": faq,
+        }
+
+        # Geminiで分析
+        result = analyze_with_gemini(site_data)
+        result["analyzed_url"] = url
+        return jsonify(result)
+
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "サイトの取得がタイムアウトしました（10秒）"}), 504
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "サイトに接続できませんでした。URLを確認してください"}), 502
+    except requests.exceptions.HTTPError as e:
+        return jsonify({"error": f"サイトからエラーが返されました: {e.response.status_code}"}), 502
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
+    except Exception as e:
+        return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5002, debug=True)
