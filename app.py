@@ -1,15 +1,51 @@
 import json
 import re
+import sqlite3
+import os
+from datetime import datetime
 from urllib.parse import urlparse, urljoin
 
 import google.generativeai as genai
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, abort
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
+# ===== ログDB初期化 =====
+DB_PATH = os.environ.get("DB_PATH", "geo_logs.db")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "zettai2026")
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            score INTEGER,
+            grade TEXT,
+            ip TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def log_analysis(url, score, grade, ip):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO analyses (url, score, grade, ip, created_at) VALUES (?,?,?,?,?)",
+            (url, score, grade, ip, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+init_db()
 
 # Gemini API設定
 import os
@@ -350,6 +386,11 @@ def analyze():
         # Geminiで分析
         result = analyze_with_gemini(site_data)
         result["analyzed_url"] = url
+
+        # ログ記録
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        log_analysis(url, result.get("overall_score"), result.get("grade"), ip)
+
         return jsonify(result)
 
     except requests.exceptions.Timeout:
@@ -362,6 +403,51 @@ def analyze():
         return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
     except Exception as e:
         return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
+
+
+@app.route("/admin/logs")
+def admin_logs():
+    token = request.args.get("token", "")
+    if token != ADMIN_TOKEN:
+        abort(403)
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, url, score, grade, ip, created_at FROM analyses ORDER BY id DESC LIMIT 200"
+    ).fetchall()
+    conn.close()
+    total = len(rows)
+    avg = round(sum(r[2] for r in rows if r[2]) / total, 1) if total else 0
+    html = f"""<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<title>GEOチェッカー 管理ログ</title>
+<style>
+body{{font-family:'Noto Sans JP',sans-serif;background:#F8FAFC;color:#111;padding:2rem}}
+h1{{font-size:1.5rem;font-weight:700;margin-bottom:1rem}}
+.stats{{display:flex;gap:1.5rem;margin-bottom:1.5rem}}
+.stat{{background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:1rem 1.5rem}}
+.stat-num{{font-size:2rem;font-weight:800;color:#2563EB}}
+.stat-label{{font-size:.85rem;color:#6B7280}}
+table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+th{{background:#F1F5F9;padding:.75rem 1rem;text-align:left;font-size:.85rem;color:#374151}}
+td{{padding:.75rem 1rem;border-top:1px solid #F1F5F9;font-size:.9rem}}
+.grade{{font-weight:700;padding:.2rem .5rem;border-radius:4px;font-size:.85rem}}
+.A{{background:#DCFCE7;color:#16A34A}}.B{{background:#FEF9C3;color:#CA8A04}}
+.C,.D{{background:#FEE2E2;color:#DC2626}}.F{{background:#111;color:#fff}}
+</style></head><body>
+<h1>📊 GEOチェッカー 分析ログ</h1>
+<div class="stats">
+  <div class="stat"><div class="stat-num">{total}</div><div class="stat-label">総分析数</div></div>
+  <div class="stat"><div class="stat-num">{avg}</div><div class="stat-label">平均スコア</div></div>
+</div>
+<table>
+<tr><th>#</th><th>URL</th><th>スコア</th><th>グレード</th><th>IP</th><th>日時</th></tr>
+"""
+    for r in rows:
+        rid, url, score, grade, ip, created_at = r
+        grade_cls = (grade or "F")[0]
+        html += f'<tr><td>{rid}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
+    html += "</table></body></html>"
+    return html
 
 
 if __name__ == "__main__":
