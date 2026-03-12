@@ -52,7 +52,7 @@ init_db()
 
 # Gemini API設定
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel("gemini-2.0-flash")  # 無料枠対応モデル
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
