@@ -2,7 +2,10 @@ import json
 import re
 import sqlite3
 import os
+import time
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 from urllib.parse import urlparse, urljoin
 
 import google.generativeai as genai
@@ -48,9 +51,8 @@ def log_analysis(url, score, grade, ip):
 init_db()
 
 # Gemini API設定
-import os
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel("gemini-2.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")  # 無料枠対応モデル
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -207,8 +209,8 @@ def check_faq_content(soup, html):
     return indicators
 
 
-def analyze_with_gemini(site_data):
-    """Gemini APIで分析"""
+def analyze_with_gemini(site_data, retries=3, backoff=2):
+    """Gemini APIで分析（リトライ付き）"""
     prompt = f"""あなたはGEO（Generative Engine Optimization）の専門家です。
 以下のサイト情報を分析し、AI検索エンジン（ChatGPT、Claude、Perplexity、Gemini）に引用・参照されやすいサイトかを評価してください。
 
@@ -320,14 +322,55 @@ AIボット状況: {json.dumps(site_data['robots']['bots'], ensure_ascii=False, 
 
 statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
 """
-    response = model.generate_content(prompt)
-    text = response.text.strip()
-    # JSONブロックを抽出
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].split("```")[0].strip()
-    return json.loads(text)
+    last_error = None
+    for attempt in range(retries):
+        try:
+            response = model.generate_content(
+                prompt,
+                request_options={"timeout": 60},
+            )
+            text = response.text.strip()
+
+            # JSONブロックを抽出（ネストされたコードブロックに対応）
+            import re as _re
+            m = _re.search(r'```json\s*([\s\S]*?)```', text)
+            if m:
+                text = m.group(1).strip()
+            else:
+                m = _re.search(r'```\s*([\s\S]*?)```', text)
+                if m:
+                    text = m.group(1).strip()
+
+            # JSONとして試行
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                start = text.find('{')
+                end = text.rfind('}')
+                if start != -1 and end != -1:
+                    return json.loads(text[start:end+1])
+                raise
+
+        except Exception as e:
+            err_str = str(e)
+            last_error = e
+            # レート制限 or 過負荷 → リトライ
+            if any(kw in err_str for kw in ("429", "quota", "RESOURCE_EXHAUSTED", "overloaded", "503")):
+                if attempt < retries - 1:
+                    wait = backoff * (attempt + 1)
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError("APIの利用制限に達しました。しばらく待ってから再度お試しください。") from e
+            # 認証エラー → リトライ不要
+            if any(kw in err_str for kw in ("401", "403", "API_KEY", "invalid", "INVALID_ARGUMENT")):
+                raise RuntimeError("APIキーが無効です。管理者にお問い合わせください。") from e
+            # その他 → リトライ
+            if attempt < retries - 1:
+                time.sleep(backoff)
+                continue
+            raise
+
+    raise last_error
 
 
 @app.route("/")
