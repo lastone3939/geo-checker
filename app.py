@@ -13,9 +13,22 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, render_template, request, abort
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://web-production-d89ed.up.railway.app", "http://localhost:5002"])
+
+# ===== レート制限（EDoS対策） =====
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
+
+# 1日の分析上限（API費用保護）
+DAILY_LIMIT = int(os.environ.get("DAILY_ANALYSIS_LIMIT", "500"))
 
 # ===== ログDB初期化 =====
 DB_PATH = os.environ.get("DB_PATH", "geo_logs.db")
@@ -379,7 +392,21 @@ def index():
 
 
 @app.route("/api/analyze", methods=["POST"])
+@limiter.limit("5 per minute;20 per hour;50 per day")
 def analyze():
+    # 1日の全体上限チェック（API費用保護）
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        today = datetime.now().strftime("%Y-%m-%d")
+        count = conn.execute(
+            "SELECT COUNT(*) FROM analyses WHERE created_at LIKE ?", (f"{today}%",)
+        ).fetchone()[0]
+        conn.close()
+        if count >= DAILY_LIMIT:
+            return jsonify({"error": "本日の分析上限（{}件）に達しました。明日またお試しください。".format(DAILY_LIMIT)}), 429
+    except Exception:
+        pass
+
     data = request.get_json()
     url = data.get("url", "").strip()
     if not url:
@@ -491,6 +518,11 @@ td{{padding:.75rem 1rem;border-top:1px solid #F1F5F9;font-size:.9rem}}
         html += f'<tr><td>{rid}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
     html += "</table></body></html>"
     return html
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": "リクエストが多すぎます。しばらく待ってから再度お試しください。"}), 429
 
 
 if __name__ == "__main__":
