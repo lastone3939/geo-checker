@@ -983,9 +983,16 @@
             <div class="video-subtitle">写真を全部まとめて10秒の動画に。GBPにアップするだけでSEO評価UP！</div>
           </div>
         </div>
-        <button id="video-start-btn" class="video-start-btn" onclick="startVideoGeneration()">
-          🎬 スライドショー動画を作る
-        </button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button id="btn-normal" class="video-start-btn" onclick="startVideoGeneration(false)"
+            style="flex:1;background:#1A73E8">
+            🎬 ノーマル動画
+          </button>
+          <button id="btn-sparkle" class="video-start-btn" onclick="startVideoGeneration(true)"
+            style="flex:1;background:linear-gradient(135deg,#f093fb,#f5576c)">
+            ✨ キラキラ動画
+          </button>
+        </div>
 
         <!-- 進捗表示 -->
         <div id="video-progress" style="display:none">
@@ -1602,10 +1609,11 @@ function showVideoSection(gbpUrl) {
   document.getElementById("video-start-btn").style.display = "block";
 }
 
-async function startVideoGeneration() {
-  const btn = document.getElementById("video-start-btn");
-  btn.disabled = true;
-  btn.style.display = "none";
+async function startVideoGeneration(sparkle) {
+  const btnNormal = document.getElementById("btn-normal");
+  const btnSparkle = document.getElementById("btn-sparkle");
+  if (btnNormal) { btnNormal.disabled = true; }
+  if (btnSparkle) { btnSparkle.disabled = true; }
   document.getElementById("video-progress").style.display = "block";
   document.getElementById("video-done").style.display = "none";
   document.getElementById("video-error").style.display = "none";
@@ -1615,7 +1623,7 @@ async function startVideoGeneration() {
     const res = await fetch("/api/create-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: currentGbpUrl })
+      body: JSON.stringify({ url: currentGbpUrl, sparkle: !!sparkle })
     });
     const data = await res.json();
     if (!res.ok || data.error) {
@@ -1626,6 +1634,11 @@ async function startVideoGeneration() {
     pollVideoStatus();
   } catch (e) {
     showVideoError("通信エラーが発生しました");
+  } finally {
+    const bn = document.getElementById("btn-normal");
+    const bs = document.getElementById("btn-sparkle");
+    if (bn) bn.disabled = false;
+    if (bs) bs.disabled = false;
   }
 }
 

@@ -665,49 +665,70 @@ def get_query_from_url(url: str) -> tuple:
 
 
 def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
-    """Google Places APIで写真URLを取得（位置情報付き検索で誤取得を防止）"""
+    """Google Places APIで写真URLを取得（Place ID優先 → テキスト検索フォールバック）"""
     if not GOOGLE_PLACES_API_KEY:
         app.logger.error("GOOGLE_PLACES_API_KEY not set")
         return []
 
-    query, lat, lng = get_query_from_url(url)
-    if not query:
-        query = extract_business_name_from_url(url) or "restaurant"
+    place_id, query, lat, lng = get_query_from_url(url)
+    photos = []
+    biz_name = ""
 
-    app.logger.info(f"Places API検索: query={query} lat={lat} lng={lng}")
+    # ルート1: Place IDが取れた場合 → Place Details APIで直接取得（最正確）
+    if place_id:
+        app.logger.info(f"Places API: Place ID直接取得 {place_id}")
+        try:
+            resp = requests.get(
+                f"https://places.googleapis.com/v1/places/{place_id}",
+                headers={
+                    "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                    "X-Goog-FieldMask": "displayName,photos",
+                },
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                d = resp.json()
+                photos = d.get("photos", [])
+                biz_name = d.get("displayName", {}).get("text", "")
+                app.logger.info(f"Place Details OK: {biz_name} / {len(photos)}枚")
+            else:
+                app.logger.warning(f"Place Details {resp.status_code}, フォールバック")
+        except Exception as e:
+            app.logger.warning(f"Place Details失敗: {e}, フォールバック")
 
-    search_body = {"textQuery": query, "pageSize": 1}
-    if lat and lng:
-        search_body["locationBias"] = {
-            "circle": {
-                "center": {"latitude": lat, "longitude": lng},
-                "radius": 500.0
+    # ルート2: テキスト検索（位置情報付き）
+    if not photos:
+        if not query:
+            query = extract_business_name_from_url(url) or "restaurant"
+        app.logger.info(f"Places APIテキスト検索: query={query} lat={lat} lng={lng}")
+        search_body = {"textQuery": query, "pageSize": 1}
+        if lat and lng:
+            search_body["locationBias"] = {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lng},
+                    "radius": 300.0
+                }
             }
-        }
-
-    try:
-        resp = requests.post(
-            "https://places.googleapis.com/v1/places:searchText",
-            headers={
-                "Content-Type": "application/json",
-                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.photos",
-            },
-            json=search_body,
-            timeout=15,
-        )
-        resp.raise_for_status()
-        places = resp.json().get("places", [])
-        if not places:
-            app.logger.warning(f"Places API: no results for {query}")
+        try:
+            resp = requests.post(
+                "https://places.googleapis.com/v1/places:searchText",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                    "X-Goog-FieldMask": "places.id,places.displayName,places.photos",
+                },
+                json=search_body,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            places = resp.json().get("places", [])
+            if places:
+                photos = places[0].get("photos", [])
+                biz_name = places[0].get("displayName", {}).get("text", "")
+                app.logger.info(f"Text Search OK: {biz_name} / {len(photos)}枚")
+        except Exception as e:
+            app.logger.error(f"Places API text search error: {e}")
             return []
-        place = places[0]
-        photos = place.get("photos", [])
-        biz_name = place.get("displayName", {}).get("text", "")
-        app.logger.info(f"Places API hit: {biz_name} / {len(photos)}枚")
-    except Exception as e:
-        app.logger.error(f"Places API error: {e}")
-        return []
 
     photo_urls = []
     for photo in photos[:max_photos]:
@@ -822,7 +843,7 @@ def download_photo(url: str, dest: Path) -> bool:
         return False
 
 
-def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 20.0) -> bool:
+def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 20.0, sparkle: bool = False) -> bool:
     """FFmpegでスライドショー動画を生成（GBP規格: MP4 H.264 720p 最大30秒）"""
     n = len(photo_paths)
     if n == 0:
@@ -873,6 +894,27 @@ def create_slideshow_video(photo_paths: list, output_path: Path, duration: float
         if r2.returncode != 0:
             app.logger.error(f"concat ffmpeg error: {r2.stderr[-300:]}")
             return False
+
+        if sparkle and output_path.exists():
+            tmp_path = output_path.parent / "tmp_base.mp4"
+            import shutil; shutil.copy2(str(output_path), str(tmp_path))
+            sparkle_cmd = [
+                "ffmpeg", "-y", "-i", str(tmp_path),
+                "-vf", (
+                    "eq=brightness=0.08:saturation=1.4:contrast=1.05,"
+                    "geq=lum='min(255,lum(X\,Y)+if(gt(random(1),0.9975),220,0))'"
+                    ":cb='cb(X\,Y)':cr='cr(X\,Y)'"
+                ),
+                "-c:v", "libx264", "-preset", "fast",
+                "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                str(output_path),
+            ]
+            r3 = subprocess.run(sparkle_cmd, capture_output=True, text=True, timeout=120)
+            if r3.returncode != 0:
+                app.logger.error(f"sparkle error: {r3.stderr[-200:]}")
+                shutil.copy2(str(tmp_path), str(output_path))
+            try: tmp_path.unlink()
+            except: pass
 
         return output_path.exists() and output_path.stat().st_size > 1000
 
@@ -938,7 +980,7 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
         app.logger.error(f"analyze job error ({job_type}): {e}")
 
 
-def run_video_job(job_id: str, url: str):
+def run_video_job(job_id: str, url: str, sparkle: bool = False):
     """バックグラウンドで動画生成ジョブを実行"""
     try:
         VIDEO_JOBS[job_id]["status"] = "scraping"
@@ -975,7 +1017,7 @@ def run_video_job(job_id: str, url: str):
 
         # 3. 動画生成
         output_path = job_dir / "slideshow.mp4"
-        success = create_slideshow_video(photo_paths, output_path, duration=10.0)
+        success = create_slideshow_video(photo_paths, output_path, duration=20.0, sparkle=sparkle)
 
         if success and output_path.exists():
             VIDEO_JOBS[job_id]["status"] = "done"
@@ -1125,7 +1167,8 @@ def create_video():
         "created_at": datetime.now().isoformat()
     }
 
-    t = threading.Thread(target=run_video_job, args=(job_id, url))
+    sparkle = bool(data.get("sparkle", False))
+    t = threading.Thread(target=run_video_job, args=(job_id, url, sparkle))
     t.daemon = True
     t.start()
 
