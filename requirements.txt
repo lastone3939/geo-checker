@@ -6,4 +6,3 @@ gunicorn
 python-dotenv
 flask-limiter
 Pillow
-playwright

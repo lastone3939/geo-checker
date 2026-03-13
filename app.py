@@ -35,6 +35,16 @@ limiter = Limiter(
 # 1日の分析上限（API費用保護）
 DAILY_LIMIT = int(os.environ.get("DAILY_ANALYSIS_LIMIT", "500"))
 
+# Google Places API
+GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+
+# SMTP設定（メール送信）
+SMTP_HOST = os.environ.get("SMTP_HOST", "sv14580.xserver.jp")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+SMTP_USER = os.environ.get("SMTP_USER", "omakaseaio@givefast.jp")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", "omakaseaio@givefast.jp")
+
 # ===== ログDB初期化 =====
 DB_PATH = os.environ.get("DB_PATH", "geo_logs.db")
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")  # 必ず環境変数で設定すること
@@ -636,8 +646,72 @@ steps: [
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
+def get_query_from_url(url: str) -> str:
+    """Google Maps URLからビジネス名/検索クエリを抽出"""
+    from urllib.parse import unquote, parse_qs
+    # /place/ビジネス名/ パターン
+    m = re.search(r'/place/([^/@]+)', url)
+    if m:
+        return unquote(m.group(1)).replace('+', ' ')
+    # ?q= パターン
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    if 'q' in qs:
+        return qs['q'][0]
+    return ""
+
+
 def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
-    """PlaywrightでGoogleマップから写真URLを取得"""
+    """Google Places APIで写真URLを取得（Playwright不要）"""
+    if not GOOGLE_PLACES_API_KEY:
+        app.logger.error("GOOGLE_PLACES_API_KEY not set")
+        return []
+
+    # 検索クエリを取得
+    query = get_query_from_url(url) or extract_business_name_from_url(url) or "restaurant"
+    app.logger.info(f"Places API検索クエリ: {query}")
+
+    # Places API テキスト検索
+    try:
+        resp = requests.post(
+            "https://places.googleapis.com/v1/places:searchText",
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.photos",
+            },
+            json={"textQuery": query, "pageSize": 1},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        places = resp.json().get("places", [])
+        if not places:
+            app.logger.warning(f"Places API: '{query}' の結果なし")
+            return []
+
+        place = places[0]
+        photos = place.get("photos", [])
+        biz_name = place.get("displayName", {}).get("text", "")
+        app.logger.info(f"Places API: {biz_name} / 写真{len(photos)}枚取得")
+    except Exception as e:
+        app.logger.error(f"Places API error: {e}")
+        return []
+
+    # 写真URLを構築
+    photo_urls = []
+    for photo in photos[:max_photos]:
+        name = photo.get("name", "")
+        if name:
+            photo_urls.append(
+                f"https://places.googleapis.com/v1/{name}/media"
+                f"?maxWidthPx=1280&maxHeightPx=720&key={GOOGLE_PLACES_API_KEY}&skipHttpRedirect=false"
+            )
+
+    return photo_urls
+
+
+def _REMOVED_playwright_scrape(url: str, max_photos: int = 12) -> list:
+    """(旧) PlaywrightでGoogleマップから写真URLを取得"""
     from playwright.sync_api import sync_playwright
 
     photo_urls = []
@@ -1072,6 +1146,85 @@ def video_download(job_id: str):
         download_name="gbp_slideshow.mp4",
         mimetype="video/mp4"
     )
+
+
+def send_video_email(to_email: str, business_name: str, video_path: Path) -> bool:
+    """お客様へ動画をメールで送信"""
+    import smtplib, ssl
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = SMTP_FROM
+        msg['To'] = to_email
+        msg['Subject'] = f"【{business_name}】GBPスライドショー動画のお届け"
+        body = f"""{business_name} 様
+
+GBPスライドショー動画を作成しましたのでお届けします。
+
+添付のMP4ファイルをGoogleビジネスプロフィールの
+「写真」→「動画」からアップロードしてください。
+
+【アップロード手順】
+1. business.google.com を開く
+2. 「写真を追加」→「動画」を選択
+3. 添付ファイルをアップロード
+
+動画のアップロードにより、GoogleマップのSEO評価が向上します。
+ご不明な点はお気軽にご連絡ください。
+
+---
+株式会社ZETTAI / 清水 望
+nozomu.shimizu@zettai.co.jp""".strip()
+
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        with open(video_path, 'rb') as f:
+            part = MIMEBase('video', 'mp4')
+            part.set_payload(f.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', 'attachment; filename="gbp_slideshow.mp4"')
+            msg.attach(part)
+
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_FROM, to_email, msg.as_bytes())
+
+        app.logger.info(f"メール送信成功: {to_email}")
+        return True
+    except Exception as e:
+        app.logger.error(f"send_video_email error: {e}")
+        return False
+
+
+@app.route("/api/send-video", methods=["POST"])
+@limiter.limit("5 per minute;20 per day")
+def send_video():
+    """生成した動画をお客様へメール送信"""
+    data = request.get_json()
+    job_id = data.get("job_id", "")
+    to_email = data.get("email", "").strip()
+    business_name = data.get("business_name", "お客様").strip()
+
+    if not job_id or not to_email:
+        return jsonify({"error": "ジョブIDとメールアドレスが必要です"}), 400
+    if "@" not in to_email or "." not in to_email.split("@")[-1]:
+        return jsonify({"error": "正しいメールアドレスを入力してください"}), 400
+
+    job = VIDEO_JOBS.get(job_id)
+    if not job or job["status"] != "done":
+        return jsonify({"error": "動画がまだ準備できていません"}), 404
+
+    video_path = Path(job["video_path"])
+    if not video_path.exists():
+        return jsonify({"error": "動画ファイルが見つかりません"}), 404
+
+    if send_video_email(to_email, business_name, video_path):
+        return jsonify({"message": f"{to_email} へ送信しました ✅"})
+    return jsonify({"error": "メール送信に失敗しました"}), 500
 
 
 @app.route("/admin/logs")

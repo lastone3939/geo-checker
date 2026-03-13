@@ -1,15 +1,12 @@
-FROM mcr.microsoft.com/playwright/python:v1.41.0-jammy
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# FFmpegインストール
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-# 依存関係インストール
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# アプリをコピー
 COPY . .
 
 ENV PORT=8080
