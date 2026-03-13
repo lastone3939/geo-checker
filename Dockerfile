@@ -12,10 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # アプリをコピー
 COPY . .
 
-# ポートはRailwayの$PORTを使用
 ENV PORT=8080
 EXPOSE 8080
 
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-CMD ["/start.sh"]
+CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180 --keep-alive 5
