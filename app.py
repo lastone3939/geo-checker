@@ -463,7 +463,7 @@ statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
 
 
 def validate_gbp_url(url):
-    """GoogleマップURLのバリデーション"""
+    """GoogleマップURLのバリデーション（緩め: google系ドメインならOK）"""
     parsed = urlparse(url)
     valid_hosts = [
         "maps.google.com", "www.google.com", "google.com",
@@ -472,12 +472,7 @@ def validate_gbp_url(url):
     ]
     host = parsed.netloc.lower()
     if any(host == h or host.endswith("." + h) for h in valid_hosts):
-        # google.com系はpathに/mapsが含まれるか、cidパラメータがあるか確認
-        if "google" in host:
-            if "/maps" in parsed.path or "cid=" in (parsed.query or "") or "place" in parsed.path:
-                return True
-        else:
-            return True
+        return True  # google系ドメインはパス問わず許可
     return False
 
 
