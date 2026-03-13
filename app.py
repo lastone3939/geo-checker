@@ -641,32 +641,50 @@ steps: [
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
-def get_query_from_url(url: str) -> str:
-    """Google Maps URLからビジネス名/検索クエリを抽出"""
+def get_query_from_url(url: str) -> tuple:
+    """Google Maps URLからビジネス名と緯度経度を抽出 → (query, lat, lng)"""
     from urllib.parse import unquote, parse_qs
-    # /place/ビジネス名/ パターン
-    m = re.search(r'/place/([^/@]+)', url)
+    query = ""
+    lat, lng = None, None
+    m = re.search(r"/place/([^/@]+)", url)
     if m:
-        return unquote(m.group(1)).replace('+', ' ')
-    # ?q= パターン
-    parsed = urlparse(url)
-    qs = parse_qs(parsed.query)
-    if 'q' in qs:
-        return qs['q'][0]
-    return ""
+        query = unquote(m.group(1)).replace("+", " ")
+    if not query:
+        parsed_u = urlparse(url)
+        qs = parse_qs(parsed_u.query)
+        if "q" in qs:
+            query = qs["q"][0]
+    coord_m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", url)
+    if coord_m:
+        lat, lng = float(coord_m.group(1)), float(coord_m.group(2))
+    else:
+        coord_m2 = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", url)
+        if coord_m2:
+            lat, lng = float(coord_m2.group(1)), float(coord_m2.group(2))
+    return query, lat, lng
 
 
 def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
-    """Google Places APIで写真URLを取得（Playwright不要）"""
+    """Google Places APIで写真URLを取得（位置情報付き検索で誤取得を防止）"""
     if not GOOGLE_PLACES_API_KEY:
         app.logger.error("GOOGLE_PLACES_API_KEY not set")
         return []
 
-    # 検索クエリを取得
-    query = get_query_from_url(url) or extract_business_name_from_url(url) or "restaurant"
-    app.logger.info(f"Places API検索クエリ: {query}")
+    query, lat, lng = get_query_from_url(url)
+    if not query:
+        query = extract_business_name_from_url(url) or "restaurant"
 
-    # Places API テキスト検索
+    app.logger.info(f"Places API検索: query={query} lat={lat} lng={lng}")
+
+    search_body = {"textQuery": query, "pageSize": 1}
+    if lat and lng:
+        search_body["locationBias"] = {
+            "circle": {
+                "center": {"latitude": lat, "longitude": lng},
+                "radius": 500.0
+            }
+        }
+
     try:
         resp = requests.post(
             "https://places.googleapis.com/v1/places:searchText",
@@ -675,24 +693,22 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
                 "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
                 "X-Goog-FieldMask": "places.id,places.displayName,places.photos",
             },
-            json={"textQuery": query, "pageSize": 1},
+            json=search_body,
             timeout=15,
         )
         resp.raise_for_status()
         places = resp.json().get("places", [])
         if not places:
-            app.logger.warning(f"Places API: '{query}' の結果なし")
+            app.logger.warning(f"Places API: no results for {query}")
             return []
-
         place = places[0]
         photos = place.get("photos", [])
         biz_name = place.get("displayName", {}).get("text", "")
-        app.logger.info(f"Places API: {biz_name} / 写真{len(photos)}枚取得")
+        app.logger.info(f"Places API hit: {biz_name} / {len(photos)}枚")
     except Exception as e:
         app.logger.error(f"Places API error: {e}")
         return []
 
-    # 写真URLを構築
     photo_urls = []
     for photo in photos[:max_photos]:
         name = photo.get("name", "")
@@ -701,7 +717,6 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
                 f"https://places.googleapis.com/v1/{name}/media"
                 f"?maxWidthPx=1280&maxHeightPx=720&key={GOOGLE_PLACES_API_KEY}&skipHttpRedirect=false"
             )
-
     return photo_urls
 
 
@@ -1228,6 +1243,53 @@ def send_video():
     if send_video_email(to_email, business_name, video_path):
         return jsonify({"message": f"{to_email} へ送信しました ✅"})
     return jsonify({"error": "メール送信に失敗しました"}), 500
+
+
+@app.route("/api/send-report", methods=["POST"])
+@limiter.limit("5 per minute;20 per day")
+def send_report():
+    """分析レポートをHTMLメールで送信"""
+    data = request.get_json()
+    to_email = data.get("email", "").strip()
+    business_name = data.get("business_name", "").strip() or "お客様"
+    report_html = data.get("report_html", "").strip()
+    report_type = data.get("report_type", "診断レポート")
+
+    if not to_email or not report_html:
+        return jsonify({"error": "メールアドレスとレポート内容が必要です"}), 400
+    if "@" not in to_email or "." not in to_email.split("@")[-1]:
+        return jsonify({"error": "正しいメールアドレスを入力してください"}), 400
+
+    try:
+        import smtplib, ssl
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = SMTP_FROM
+        msg["To"] = to_email
+        msg["Subject"] = f"【{business_name}】{report_type}のお届け"
+
+        text_body = f"{business_name} 様\n\n{report_type}をお届けします。\n\n---\n株式会社ZETTAI / 清水 望\nnozomu.shimizu@zettai.co.jp"
+        html_body = f"""<html><body style="font-family:sans-serif;max-width:700px;margin:0 auto;padding:20px">
+<p>{business_name} 様</p><p>{report_type}をお届けします。</p><hr>
+{report_html}
+<hr><p>株式会社ZETTAI / 清水 望<br><a href="mailto:nozomu.shimizu@zettai.co.jp">nozomu.shimizu@zettai.co.jp</a></p>
+</body></html>"""
+
+        msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_FROM, to_email, msg.as_bytes())
+
+        app.logger.info(f"send_report OK: {to_email}")
+        return jsonify({"message": f"{to_email} へ送信しました ✅"})
+    except Exception as e:
+        app.logger.error(f"send_report error: {e}")
+        return jsonify({"error": "メール送信に失敗しました"}), 500
 
 
 @app.route("/admin/logs")
