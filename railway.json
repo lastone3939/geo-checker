@@ -1,0 +1,9 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE"
+  },
+  "deploy": {
+    "startCommand": "gunicorn app:app --bind 0.0.0.0:8080 --workers 1 --timeout 180 --keep-alive 5"
+  }
+}
