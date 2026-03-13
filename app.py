@@ -32,7 +32,7 @@ DAILY_LIMIT = int(os.environ.get("DAILY_ANALYSIS_LIMIT", "500"))
 
 # ===== ログDB初期化 =====
 DB_PATH = os.environ.get("DB_PATH", "geo_logs.db")
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "zettai2026")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")  # 必ず環境変数で設定すること
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -97,9 +97,38 @@ HEADERS = {
 TIMEOUT = 10
 
 
+BLOCKED_IP_RANGES = [
+    "127.", "0.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+    "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+    "192.168.", "169.254.", "::1", "fc00:", "fd",
+]
+
+def is_safe_url(url: str) -> bool:
+    """SSRF対策: 内部IPへのアクセスを拒否"""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        host = parsed.hostname or ""
+        import socket
+        try:
+            resolved = socket.gethostbyname(host)
+        except socket.gaierror:
+            return True  # 名前解決できない場合はfetch時にエラーになる
+        for blocked in BLOCKED_IP_RANGES:
+            if resolved.startswith(blocked) or resolved == blocked.rstrip("."):
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def fetch_page(url):
-    """サイトのHTMLを取得"""
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    """サイトのHTMLを取得（SSRF対策付き）"""
+    if not is_safe_url(url):
+        raise ValueError("内部ネットワークへのアクセスは許可されていません")
+    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
     resp.raise_for_status()
     resp.encoding = resp.apparent_encoding or "utf-8"
     return resp.text
@@ -722,7 +751,8 @@ def analyze():
     except json.JSONDecodeError:
         return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
     except Exception as e:
-        return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
+        app.logger.error(f"analyze error: {e}")  # サーバーログのみ
+        return jsonify({"error": "分析中にエラーが発生しました。しばらくしてから再度お試しください"}), 500
 
 
 @app.route("/api/analyze-gbp", methods=["POST"])
@@ -799,13 +829,14 @@ def analyze_gbp():
     except json.JSONDecodeError:
         return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
     except Exception as e:
-        return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
+        app.logger.error(f"analyze-gbp error: {e}")  # サーバーログのみ
+        return jsonify({"error": "分析中にエラーが発生しました。しばらくしてから再度お試しください"}), 500
 
 
 @app.route("/admin/logs")
 def admin_logs():
     token = request.args.get("token", "")
-    if token != ADMIN_TOKEN:
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
         abort(403)
     conn = sqlite3.connect(DB_PATH)
     # Web診断ログ
