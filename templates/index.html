@@ -669,6 +669,115 @@
       border-top: 1px solid var(--border);
       margin-top: 40px;
     }
+
+    /* ==========================================
+       📱 モバイル完全対応 (max-width: 768px)
+       ========================================== */
+    @media (max-width: 768px) {
+      /* ヘッダー */
+      .site-header { padding: 10px 16px; }
+      .logo { font-size: 15px; }
+
+      /* ニュースバナー */
+      .news-banner {
+        flex-wrap: wrap;
+        font-size: 11px;
+        padding: 8px 12px;
+        gap: 4px;
+      }
+
+      /* タブ */
+      .tab-container { padding: 0 12px; }
+      .tab-btn {
+        font-size: 13px;
+        padding: 10px 14px;
+      }
+      .tab-content { padding: 24px 0 40px; }
+
+      /* ヒーロー */
+      .tab-hero .sub { font-size: 13px; }
+
+      /* フォーム */
+      .form-wrap { flex-direction: column; }
+      .url-input { font-size: 16px; padding: 12px 14px; }
+      .submit-btn {
+        width: 100%;
+        padding: 14px;
+        font-size: 15px;
+        border-radius: 12px;
+        min-height: 48px;
+      }
+
+      /* 結果セクション */
+      .result-section { padding: 24px 12px 60px; }
+
+      /* 結果ヘッダー */
+      .result-header {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .result-header .site-url { font-size: 13px; }
+
+      /* スコアカード */
+      .score-card { padding: 24px 16px; }
+      .score-gauge { width: 120px; height: 120px; }
+      .score-gauge svg { width: 120px; height: 120px; }
+      .score-gauge .score-big { font-size: 36px; }
+      .score-card .summary-text { font-size: 13px; }
+
+      /* 指標バー */
+      .metric-row { flex-wrap: wrap; gap: 6px; }
+      .metric-name { width: 90px; font-size: 12px; }
+      .metric-icon { font-size: 16px; width: 24px; }
+
+      /* 詳細カード */
+      .detail-card { padding: 16px; }
+      .detail-card .card-title { font-size: 13px; }
+      .detail-card .card-detail { font-size: 12px; }
+      .detail-card .recs li { font-size: 12px; }
+
+      /* アクションアイテム */
+      .action-item { padding: 10px 12px; gap: 10px; }
+      .action-text { font-size: 12px; }
+
+      /* 実践ガイド */
+      .practical-guide { padding: 16px; }
+      .practical-guide pre { font-size: 11px; padding: 12px; }
+
+      /* クイックウィン */
+      .quick-win-item { padding: 14px; }
+      .quick-win-item ol li { font-size: 12px; }
+
+      /* 投稿サンプル・返信テンプレート */
+      .guide-text-block { font-size: 13px; padding: 12px; }
+
+      /* GBPニュース */
+      .gbp-news-card { padding: 12px 16px; font-size: 12px; }
+
+      /* アクションボタン群 */
+      .action-btns { flex-direction: column; }
+      .action-btns button { width: 100%; min-height: 48px; }
+
+      /* エラー */
+      .error-section { margin: 40px auto; padding: 0 12px; }
+
+      /* フッター */
+      .site-footer { padding: 16px 12px; }
+    }
+
+    /* ==========================================
+       📱 極小スマホ対応 (max-width: 390px)
+       ========================================== */
+    @media (max-width: 390px) {
+      .logo { font-size: 13px; }
+      .tab-btn { font-size: 11px; padding: 8px 10px; }
+      .score-gauge { width: 100px; height: 100px; }
+      .score-gauge svg { width: 100px; height: 100px; }
+      .score-gauge .score-big { font-size: 30px; }
+      .detail-card { padding: 12px; }
+      .action-item { padding: 8px 10px; }
+      .practical-guide { padding: 12px; }
+    }
   </style>
 </head>
 <body>
