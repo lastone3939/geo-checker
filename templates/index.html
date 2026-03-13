@@ -42,6 +42,7 @@
       min-height: 100vh;
       line-height: 1.7;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
     /* ヘッダー */
@@ -138,7 +139,7 @@
       transition: all 0.2s;
       text-align: center;
     }
-    .tab-btn:hover { color: var(--text); }
+    .tab-btn:hover { color: var(--text); background: rgba(26,115,232,0.08); }
     .tab-btn.active {
       color: var(--primary);
       border-bottom-color: var(--primary);
@@ -211,7 +212,7 @@
       white-space: nowrap;
       transition: background 0.2s;
     }
-    .submit-btn:hover { background: #1557B0; }
+    .submit-btn:hover { background: #1557B0; opacity: 0.85; transform: translateY(-1px); }
     .submit-btn:active { background: #174EA6; }
     .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .submit-btn.gbp-btn {
@@ -668,6 +669,19 @@
       color: var(--text-sub);
       border-top: 1px solid var(--border);
       margin-top: 40px;
+    }
+
+    /* ==========================================
+       🖥️ PC対応 (min-width: 769px)
+       ========================================== */
+    @media (min-width: 769px) {
+      .tab-container { max-width: 900px; padding: 0 20px; }
+      .form-wrap { max-width: 700px; }
+      .url-input { font-size: 16px; }
+      .submit-btn { white-space: nowrap; min-width: 120px; }
+      .result-section { max-width: 900px; padding: 48px 20px 80px; }
+      #detailCards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+      #detailCards .detail-card { margin-bottom: 0; }
     }
 
     /* ==========================================
