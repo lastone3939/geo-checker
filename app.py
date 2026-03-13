@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 from urllib.parse import urlparse, urljoin, unquote
 
-import google.generativeai as genai
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, render_template, request, abort
@@ -87,9 +86,57 @@ def log_gbp_analysis(url, business_name, score, grade, ip):
 
 init_db()
 
-# Gemini API設定
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel("gemini-2.5-flash")
+# Gemini REST API設定（gRPC不使用・軽量）
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_REST_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+def call_gemini(prompt: str, retries: int = 3, backoff: int = 2) -> dict:
+    """Gemini REST APIを直接呼び出す（gRPC不使用）"""
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192},
+    }
+    last_error = None
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                GEMINI_REST_URL,
+                params={"key": GEMINI_API_KEY},
+                json=payload,
+                timeout=90,
+            )
+            if resp.status_code == 429:
+                raise RuntimeError("APIの利用制限に達しました。しばらく待ってから再度お試しください。")
+            if resp.status_code in (401, 403):
+                raise RuntimeError("APIキーが無効です。管理者にお問い合わせください。")
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # JSONブロック抽出
+            m = re.search(r'```json\s*([\s\S]*?)```', text)
+            if m:
+                text = m.group(1).strip()
+            else:
+                m = re.search(r'```\s*([\s\S]*?)```', text)
+                if m:
+                    text = m.group(1).strip()
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                start, end = text.find('{'), text.rfind('}')
+                if start != -1 and end != -1:
+                    return json.loads(text[start:end+1])
+                raise
+        except (RuntimeError, json.JSONDecodeError):
+            raise
+        except Exception as e:
+            last_error = e
+            if attempt < retries - 1:
+                time.sleep(backoff * (attempt + 1))
+                continue
+            raise
+    raise last_error
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -388,55 +435,7 @@ AIボット状況: {json.dumps(site_data['robots']['bots'], ensure_ascii=False, 
 
 statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
 """
-    last_error = None
-    for attempt in range(retries):
-        try:
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": 60},
-            )
-            text = response.text.strip()
-
-            # JSONブロックを抽出（ネストされたコードブロックに対応）
-            import re as _re
-            m = _re.search(r'```json\s*([\s\S]*?)```', text)
-            if m:
-                text = m.group(1).strip()
-            else:
-                m = _re.search(r'```\s*([\s\S]*?)```', text)
-                if m:
-                    text = m.group(1).strip()
-
-            # JSONとして試行
-            try:
-                return json.loads(text)
-            except json.JSONDecodeError:
-                start = text.find('{')
-                end = text.rfind('}')
-                if start != -1 and end != -1:
-                    return json.loads(text[start:end+1])
-                raise
-
-        except Exception as e:
-            err_str = str(e)
-            last_error = e
-            # レート制限 or 過負荷 → リトライ
-            if any(kw in err_str for kw in ("429", "quota", "RESOURCE_EXHAUSTED", "overloaded", "503")):
-                if attempt < retries - 1:
-                    wait = backoff * (attempt + 1)
-                    time.sleep(wait)
-                    continue
-                raise RuntimeError("APIの利用制限に達しました。しばらく待ってから再度お試しください。") from e
-            # 認証エラー → リトライ不要
-            if any(kw in err_str for kw in ("401", "403", "API_KEY", "invalid", "INVALID_ARGUMENT")):
-                raise RuntimeError("APIキーが無効です。管理者にお問い合わせください。") from e
-            # その他 → リトライ
-            if attempt < retries - 1:
-                time.sleep(backoff)
-                continue
-            raise
-
-    raise last_error
+    return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
 def validate_gbp_url(url):
@@ -620,49 +619,7 @@ steps: [
 - gbp_post_sample: そのビジネスの業種・地域に合わせた具体的な投稿文（300文字以内）。絵文字・ハッシュタグあり。投稿タイプ明示。「コピーしてそのまま使える」レベルで。
 - response_template: ポジティブ（★4-5）・ネガティブ（★1-2）両パターン。「お客様のお名前」等のプレースホルダー形式で記述。業種に合わせた言葉遣い。
 """
-    last_error = None
-    for attempt in range(retries):
-        try:
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": 60},
-            )
-            text = response.text.strip()
-
-            # JSONブロック抽出
-            m = re.search(r'```json\s*([\s\S]*?)```', text)
-            if m:
-                text = m.group(1).strip()
-            else:
-                m = re.search(r'```\s*([\s\S]*?)```', text)
-                if m:
-                    text = m.group(1).strip()
-
-            try:
-                return json.loads(text)
-            except json.JSONDecodeError:
-                start = text.find('{')
-                end = text.rfind('}')
-                if start != -1 and end != -1:
-                    return json.loads(text[start:end+1])
-                raise
-
-        except Exception as e:
-            err_str = str(e)
-            last_error = e
-            if any(kw in err_str for kw in ("429", "quota", "RESOURCE_EXHAUSTED", "overloaded", "503")):
-                if attempt < retries - 1:
-                    time.sleep(backoff * (attempt + 1))
-                    continue
-                raise RuntimeError("APIの利用制限に達しました。しばらく待ってから再度お試しください。") from e
-            if any(kw in err_str for kw in ("401", "403", "API_KEY", "invalid", "INVALID_ARGUMENT")):
-                raise RuntimeError("APIキーが無効です。管理者にお問い合わせください。") from e
-            if attempt < retries - 1:
-                time.sleep(backoff)
-                continue
-            raise
-
-    raise last_error
+    return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
 @app.route("/")

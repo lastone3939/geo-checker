@@ -2,7 +2,6 @@ flask
 flask-cors
 requests
 beautifulsoup4
-google-generativeai
 gunicorn
 python-dotenv
 flask-limiter
