@@ -636,57 +636,89 @@ steps: [
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
-def scrape_gbp_photos(url: str, max_photos: int = 15) -> list:
+def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
     """PlaywrightでGoogleマップから写真URLを取得"""
     from playwright.sync_api import sync_playwright
-    import re as _re
 
     photo_urls = []
+    seen = set()
+
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-setuid-sandbox",
+                    "--single-process",
+                ]
             )
-            page = browser.new_page(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            ctx = browser.new_context(
+                user_agent="Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+                viewport={"width": 390, "height": 844},
+                locale="ja-JP",
             )
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            page = ctx.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
             page.wait_for_timeout(3000)
 
-            # 写真タブをクリック
-            try:
-                photo_btn = page.locator("button[aria-label*=写真], button[aria-label*=Photo], [data-tab-index=2]").first
-                if photo_btn.is_visible():
-                    photo_btn.click()
-                    page.wait_for_timeout(2000)
-            except Exception:
-                pass
+            # 写真タブを探してクリック
+            for selector in [
+                "button[aria-label*='写真']",
+                "button[aria-label*='Photo']",
+                "[jsaction*='pane.rating.morePhotos']",
+                "a[href*='photos']",
+            ]:
+                try:
+                    el = page.locator(selector).first
+                    if el.is_visible(timeout=2000):
+                        el.click()
+                        page.wait_for_timeout(2000)
+                        break
+                except Exception:
+                    pass
 
-            # 写真を下スクロールして追加読み込み
-            for _ in range(3):
+            # スクロールして追加写真を読み込む
+            for _ in range(4):
                 page.keyboard.press("End")
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(800)
 
-            # 画像URLを抽出
-            imgs = page.query_selector_all("img[src*=googleusercontent.com], img[src*=lh3.googleusercontent.com], img[src*=lh5.googleusercontent.com]")
+            # lh3.googleusercontent.com の画像URLを収集
+            imgs = page.evaluate("""() => {
+                const imgs = document.querySelectorAll('img');
+                const urls = [];
+                imgs.forEach(img => {
+                    const src = img.src || img.getAttribute('src') || '';
+                    if (src.includes('googleusercontent.com') && src.length > 50) {
+                        urls.push(src);
+                    }
+                });
+                // CSSのbackground-imageも探す
+                document.querySelectorAll('[style]').forEach(el => {
+                    const style = el.getAttribute('style') || '';
+                    const m = style.match(/url\\(["']?(https:\\/\\/[^"')]+googleusercontent[^"')]+)["']?\\)/);
+                    if (m) urls.push(m[1]);
+                });
+                return urls;
+            }""")
 
-            seen = set()
-            for img in imgs:
-                src = img.get_attribute("src") or ""
-                # サムネイル → 高解像度に変換
-                if "googleusercontent.com" in src and src not in seen:
-                    high_res = _re.sub(r"=w\d+-h\d+.*$", "=w1200-h800", src)
-                    if high_res not in seen:
-                        seen.add(high_res)
-                        photo_urls.append(high_res)
-                        if len(photo_urls) >= max_photos:
-                            break
+            for src in imgs:
+                high_res = re.sub(r"=(?:s\d+|w\d+-h\d+)[^&\"' ]*", "=w1200-h800", src)
+                if high_res not in seen and len(high_res) > 60:
+                    seen.add(high_res)
+                    photo_urls.append(high_res)
+                    if len(photo_urls) >= max_photos:
+                        break
 
+            ctx.close()
             browser.close()
+
     except Exception as e:
         app.logger.error(f"scrape_gbp_photos error: {e}")
 
+    app.logger.info(f"scrape_gbp_photos: {len(photo_urls)}枚取得")
     return photo_urls
 
 
