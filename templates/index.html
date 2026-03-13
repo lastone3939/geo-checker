@@ -792,6 +792,25 @@
       .action-item { padding: 8px 10px; }
       .practical-guide { padding: 12px; }
     }
+
+    /* 動画生成セクション */
+    .video-section { margin-top: 24px; }
+    .video-card { background: #fff; border: 2px solid #1A73E8; border-radius: 16px; padding: 24px; }
+    .video-card-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+    .video-icon { font-size: 36px; flex-shrink: 0; }
+    .video-title { font-size: 18px; font-weight: 700; color: #1A73E8; margin-bottom: 4px; }
+    .video-subtitle { font-size: 14px; color: #5F6368; }
+    .video-start-btn { width: 100%; padding: 16px; background: #1A73E8; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+    .video-start-btn:hover { opacity: 0.85; }
+    .video-start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .progress-bar-wrap { background: #F1F3F4; border-radius: 8px; height: 12px; margin: 16px 0 8px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #1A73E8, #34A853); border-radius: 8px; transition: width .5s ease; }
+    .video-status-text { font-size: 13px; color: #5F6368; text-align: center; }
+    .video-done-msg { font-size: 16px; font-weight: 700; color: #34A853; margin: 16px 0 12px; text-align: center; }
+    .video-download-btn { display: block; text-align: center; background: #34A853; color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    .video-download-btn:hover { opacity: 0.85; }
+    .video-tips { background: #FFF8E1; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #5F6368; }
+    .video-error-msg { background: #FCE8E6; color: #EA4335; padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -952,6 +971,44 @@
     <div id="practicalGuideSection" class="fade-up" style="animation-delay: 0.5s; display: none;">
       <p class="section-title">🛠️ 実践ガイド（今日からできること）</p>
       <div id="practicalGuideContent"></div>
+    </div>
+
+    <!-- 動画生成セクション（GBP診断結果の直後に追加） -->
+    <div id="video-section" class="video-section" style="display:none">
+      <div class="video-card">
+        <div class="video-card-header">
+          <span class="video-icon">🎬</span>
+          <div>
+            <div class="video-title">GBP スライドショー動画を自動生成</div>
+            <div class="video-subtitle">写真を全部まとめて10秒の動画に。GBPにアップするだけでSEO評価UP！</div>
+          </div>
+        </div>
+        <button id="video-start-btn" class="video-start-btn" onclick="startVideoGeneration()">
+          🎬 スライドショー動画を作る
+        </button>
+
+        <!-- 進捗表示 -->
+        <div id="video-progress" style="display:none">
+          <div class="progress-bar-wrap">
+            <div id="video-progress-bar" class="progress-bar-fill" style="width:0%"></div>
+          </div>
+          <div id="video-status-text" class="video-status-text">処理中...</div>
+        </div>
+
+        <!-- 完成後 -->
+        <div id="video-done" style="display:none">
+          <div class="video-done-msg">✅ 動画が完成しました！</div>
+          <a id="video-download-link" class="video-download-btn" href="#" download>
+            ⬇️ 動画をダウンロード（MP4）
+          </a>
+          <div class="video-tips">
+            💡 <strong>使い方:</strong> ダウンロードしたMP4をGoogleビジネスプロフィールの「写真」タブ → 「動画」から投稿してください
+          </div>
+        </div>
+
+        <!-- エラー -->
+        <div id="video-error" style="display:none" class="video-error-msg"></div>
+      </div>
     </div>
 
     <!-- ボタン群 -->
@@ -1367,6 +1424,13 @@ function showResults(data, mode) {
     guideSection.style.display = 'none';
   }
 
+  // GBP診断結果表示後に動画セクションを表示
+  if (mode === 'gbp') {
+    showVideoSection(data.analyzed_url || '');
+  } else {
+    document.getElementById('video-section').style.display = 'none';
+  }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1451,6 +1515,97 @@ function copyReport() {
     btn.style.background = 'var(--good)';
     setTimeout(() => { btn.textContent = 'レポートをコピー'; btn.style.background = ''; }, 2000);
   });
+}
+
+// ===== 動画生成機能 =====
+let currentVideoJobId = null;
+let videoPollingTimer = null;
+let currentGbpUrl = "";
+
+function showVideoSection(gbpUrl) {
+  currentGbpUrl = gbpUrl;
+  document.getElementById("video-section").style.display = "block";
+  document.getElementById("video-progress").style.display = "none";
+  document.getElementById("video-done").style.display = "none";
+  document.getElementById("video-error").style.display = "none";
+  document.getElementById("video-start-btn").disabled = false;
+  document.getElementById("video-start-btn").style.display = "block";
+}
+
+async function startVideoGeneration() {
+  const btn = document.getElementById("video-start-btn");
+  btn.disabled = true;
+  btn.style.display = "none";
+  document.getElementById("video-progress").style.display = "block";
+  document.getElementById("video-done").style.display = "none";
+  document.getElementById("video-error").style.display = "none";
+  updateProgressBar(5, "写真を取得中...");
+
+  try {
+    const res = await fetch("/api/create-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: currentGbpUrl })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      showVideoError(data.error || "動画生成の開始に失敗しました");
+      return;
+    }
+    currentVideoJobId = data.job_id;
+    pollVideoStatus();
+  } catch (e) {
+    showVideoError("通信エラーが発生しました");
+  }
+}
+
+function pollVideoStatus() {
+  if (!currentVideoJobId) return;
+  videoPollingTimer = setInterval(async () => {
+    try {
+      const res = await fetch("/api/video-status/" + currentVideoJobId);
+      const data = await res.json();
+
+      const statusMap = {
+        "pending": [5, "準備中..."],
+        "scraping": [25, "GoogleマップのAI写真を取得中..."],
+        "downloading": [55, "写真をダウンロード中..."],
+        "encoding": [80, "動画をエンコード中..."],
+        "done": [100, "完成！"],
+      };
+      const [pct, msg] = statusMap[data.status] || [data.progress || 0, "処理中..."];
+      updateProgressBar(pct, msg);
+
+      if (data.status === "done") {
+        clearInterval(videoPollingTimer);
+        showVideoDone();
+      } else if (data.status === "error") {
+        clearInterval(videoPollingTimer);
+        showVideoError(data.error || "エラーが発生しました");
+      }
+    } catch (e) {}
+  }, 2000);
+}
+
+function updateProgressBar(pct, msg) {
+  document.getElementById("video-progress-bar").style.width = pct + "%";
+  document.getElementById("video-status-text").textContent = msg;
+}
+
+function showVideoDone() {
+  document.getElementById("video-progress").style.display = "none";
+  document.getElementById("video-done").style.display = "block";
+  const link = document.getElementById("video-download-link");
+  link.href = "/api/video-download/" + currentVideoJobId;
+}
+
+function showVideoError(msg) {
+  document.getElementById("video-progress").style.display = "none";
+  document.getElementById("video-start-btn").style.display = "block";
+  document.getElementById("video-start-btn").disabled = false;
+  const errEl = document.getElementById("video-error");
+  errEl.textContent = "❌ " + msg;
+  errEl.style.display = "block";
 }
 </script>
 </body>

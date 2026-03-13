@@ -3,14 +3,20 @@ import re
 import sqlite3
 import os
 import time
+import threading
+import uuid
+import tempfile
+import subprocess
 from datetime import datetime
+from pathlib import Path
+from io import BytesIO
 from dotenv import load_dotenv
 load_dotenv()
 from urllib.parse import urlparse, urljoin, unquote
 
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, jsonify, render_template, request, abort
+from flask import Flask, jsonify, render_template, request, abort, send_file
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -85,6 +91,11 @@ def log_gbp_analysis(url, business_name, score, grade, ip):
         pass
 
 init_db()
+
+# 動画生成ジョブ管理
+VIDEO_JOBS = {}  # job_id -> {status, progress, video_path, error, created_at}
+VIDEO_DIR = Path(tempfile.gettempdir()) / "gbp_videos"
+VIDEO_DIR.mkdir(exist_ok=True)
 
 # Gemini REST API設定（gRPC不使用・軽量）
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -622,6 +633,181 @@ steps: [
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
+def scrape_gbp_photos(url: str, max_photos: int = 15) -> list:
+    """PlaywrightでGoogleマップから写真URLを取得"""
+    from playwright.sync_api import sync_playwright
+    import re as _re
+
+    photo_urls = []
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+            )
+            page = browser.new_page(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            )
+            page.goto(url, wait_until="networkidle", timeout=30000)
+            page.wait_for_timeout(3000)
+
+            # 写真タブをクリック
+            try:
+                photo_btn = page.locator("button[aria-label*=写真], button[aria-label*=Photo], [data-tab-index=2]").first
+                if photo_btn.is_visible():
+                    photo_btn.click()
+                    page.wait_for_timeout(2000)
+            except Exception:
+                pass
+
+            # 写真を下スクロールして追加読み込み
+            for _ in range(3):
+                page.keyboard.press("End")
+                page.wait_for_timeout(1000)
+
+            # 画像URLを抽出
+            imgs = page.query_selector_all("img[src*=googleusercontent.com], img[src*=lh3.googleusercontent.com], img[src*=lh5.googleusercontent.com]")
+
+            seen = set()
+            for img in imgs:
+                src = img.get_attribute("src") or ""
+                # サムネイル → 高解像度に変換
+                if "googleusercontent.com" in src and src not in seen:
+                    high_res = _re.sub(r"=w\d+-h\d+.*$", "=w1200-h800", src)
+                    if high_res not in seen:
+                        seen.add(high_res)
+                        photo_urls.append(high_res)
+                        if len(photo_urls) >= max_photos:
+                            break
+
+            browser.close()
+    except Exception as e:
+        app.logger.error(f"scrape_gbp_photos error: {e}")
+
+    return photo_urls
+
+
+def download_photo(url: str, dest: Path) -> bool:
+    """写真をダウンロード"""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+
+        from PIL import Image
+        img = Image.open(BytesIO(resp.content)).convert("RGB")
+        img = img.resize((1280, 720), Image.LANCZOS)
+        img.save(dest, "JPEG", quality=90)
+        return True
+    except Exception as e:
+        app.logger.error(f"download_photo error: {e}")
+        return False
+
+
+def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 10.0) -> bool:
+    """FFmpegでスライドショー動画を生成（Ken Burns風ズームイン/アウト）"""
+    n = len(photo_paths)
+    if n == 0:
+        return False
+
+    per_slide = duration / n
+    fps = 30
+    frames_per_slide = int(per_slide * fps)
+
+    # FFmpegフィルター構築
+    filter_parts = []
+    inputs = []
+
+    for i, p_path in enumerate(photo_paths):
+        inputs += ["-loop", "1", "-t", str(per_slide + 1), "-i", str(p_path)]
+        z = f"zoompan=z='if(lte(zoom,1.0),1.0,zoom-0.0008)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d={frames_per_slide}:s=1280x720:fps={fps}"
+        filter_parts.append(f"[{i}:v]{z},setpts=PTS-STARTPTS[v{i}]")
+
+    # クロスフェード結合
+    if n == 1:
+        filter_complex = filter_parts[0] + f";[v0]trim=0:{duration}[out]"
+    else:
+        filter_complex = ";".join(filter_parts)
+        prev = "v0"
+        for i in range(1, n):
+            out_label = f"xf{i}" if i < n - 1 else "out"
+            offset = per_slide * i - 0.5
+            filter_complex += f";[{prev}][v{i}]xfade=transition=fade:duration=0.5:offset={offset}[{out_label}]"
+            prev = out_label
+
+    cmd = [
+        "ffmpeg", "-y",
+        *inputs,
+        "-filter_complex", filter_complex,
+        "-map", "[out]",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-t", str(duration),
+        "-movflags", "+faststart",
+        str(output_path)
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        return result.returncode == 0
+    except Exception as e:
+        app.logger.error(f"ffmpeg error: {e}")
+        return False
+
+
+def run_video_job(job_id: str, url: str):
+    """バックグラウンドで動画生成ジョブを実行"""
+    try:
+        VIDEO_JOBS[job_id]["status"] = "scraping"
+        VIDEO_JOBS[job_id]["progress"] = 10
+
+        # 1. 写真URLを取得
+        photo_urls = scrape_gbp_photos(url, max_photos=12)
+
+        if not photo_urls:
+            VIDEO_JOBS[job_id]["status"] = "error"
+            VIDEO_JOBS[job_id]["error"] = "写真が見つかりませんでした。GoogleマップのURLを確認してください。"
+            return
+
+        VIDEO_JOBS[job_id]["progress"] = 40
+        VIDEO_JOBS[job_id]["status"] = "downloading"
+
+        # 2. 写真をダウンロード
+        job_dir = VIDEO_DIR / job_id
+        job_dir.mkdir(exist_ok=True)
+
+        photo_paths = []
+        for i, photo_url in enumerate(photo_urls):
+            dest = job_dir / f"photo_{i:03d}.jpg"
+            if download_photo(photo_url, dest):
+                photo_paths.append(dest)
+
+        if len(photo_paths) < 1:
+            VIDEO_JOBS[job_id]["status"] = "error"
+            VIDEO_JOBS[job_id]["error"] = "写真のダウンロードに失敗しました。"
+            return
+
+        VIDEO_JOBS[job_id]["progress"] = 70
+        VIDEO_JOBS[job_id]["status"] = "encoding"
+
+        # 3. 動画生成
+        output_path = job_dir / "slideshow.mp4"
+        success = create_slideshow_video(photo_paths, output_path, duration=10.0)
+
+        if success and output_path.exists():
+            VIDEO_JOBS[job_id]["status"] = "done"
+            VIDEO_JOBS[job_id]["progress"] = 100
+            VIDEO_JOBS[job_id]["video_path"] = str(output_path)
+            VIDEO_JOBS[job_id]["photo_count"] = len(photo_paths)
+        else:
+            VIDEO_JOBS[job_id]["status"] = "error"
+            VIDEO_JOBS[job_id]["error"] = "動画の生成に失敗しました。"
+
+    except Exception as e:
+        VIDEO_JOBS[job_id]["status"] = "error"
+        VIDEO_JOBS[job_id]["error"] = str(e)
+        app.logger.error(f"video job error: {e}")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -788,6 +974,72 @@ def analyze_gbp():
     except Exception as e:
         app.logger.error(f"analyze-gbp error: {e}")  # サーバーログのみ
         return jsonify({"error": "分析中にエラーが発生しました。しばらくしてから再度お試しください"}), 500
+
+
+@app.route("/api/create-video", methods=["POST"])
+@limiter.limit("2 per minute;5 per hour;10 per day")
+def create_video():
+    """GBP写真からスライドショー動画を生成"""
+    data = request.get_json()
+    url = data.get("url", "").strip()
+
+    if not url:
+        return jsonify({"error": "GoogleマップURLを入力してください"}), 400
+
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    if not validate_gbp_url(url):
+        return jsonify({"error": "有効なGoogleマップURLを入力してください"}), 400
+
+    job_id = str(uuid.uuid4())
+    VIDEO_JOBS[job_id] = {
+        "status": "pending",
+        "progress": 0,
+        "video_path": None,
+        "error": None,
+        "created_at": datetime.now().isoformat()
+    }
+
+    t = threading.Thread(target=run_video_job, args=(job_id, url))
+    t.daemon = True
+    t.start()
+
+    return jsonify({"job_id": job_id, "message": "動画生成を開始しました"})
+
+
+@app.route("/api/video-status/<job_id>")
+def video_status(job_id: str):
+    """動画生成ジョブのステータスを取得"""
+    job = VIDEO_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify({
+        "status": job["status"],
+        "progress": job["progress"],
+        "photo_count": job.get("photo_count"),
+        "error": job.get("error"),
+        "ready": job["status"] == "done"
+    })
+
+
+@app.route("/api/video-download/<job_id>")
+def video_download(job_id: str):
+    """生成した動画をダウンロード"""
+    job = VIDEO_JOBS.get(job_id)
+    if not job or job["status"] != "done":
+        return jsonify({"error": "動画がまだ準備できていません"}), 404
+
+    video_path = Path(job["video_path"])
+    if not video_path.exists():
+        return jsonify({"error": "動画ファイルが見つかりません"}), 404
+
+    return send_file(
+        str(video_path),
+        as_attachment=True,
+        download_name="gbp_slideshow.mp4",
+        mimetype="video/mp4"
+    )
 
 
 @app.route("/admin/logs")
