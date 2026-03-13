@@ -1104,7 +1104,7 @@ document.getElementById('gbpForm').addEventListener('submit', async (e) => {
   await runAnalysis(url, '/api/analyze-gbp', 'gbp');
 });
 
-// ===== 分析実行 =====
+// ===== 分析実行（非同期ポーリング方式） =====
 async function runAnalysis(url, endpoint, mode) {
   showLoading(mode);
 
@@ -1142,6 +1142,7 @@ async function runAnalysis(url, endpoint, mode) {
   }, 1500);
 
   try {
+    // 1. ジョブを開始
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1149,17 +1150,40 @@ async function runAnalysis(url, endpoint, mode) {
     });
     const data = await response.json();
     if (data.error) {
+      clearInterval(stepInterval);
       showError(data.error);
-    } else {
-      lastResult = data;
+      return;
+    }
+
+    // 2. ポーリングで結果待ち
+    const result = await pollAnalyzeStatus(data.job_id);
+    clearInterval(stepInterval);
+    if (result) {
+      lastResult = result;
       lastResult._mode = mode;
-      showResults(data, mode);
+      showResults(result, mode);
     }
   } catch (err) {
-    showError('通信エラーが発生しました。もう一度お試しください。');
-  } finally {
     clearInterval(stepInterval);
+    showError('通信エラーが発生しました。もう一度お試しください。');
   }
+}
+
+async function pollAnalyzeStatus(jobId, maxWait = 120000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch("/api/analyze-status/" + jobId);
+      const data = await res.json();
+      if (data.status === "done") return data.result;
+      if (data.status === "error") { showError(data.error); return null; }
+    } catch (e) {
+      // ネットワークエラーは無視してリトライ
+    }
+  }
+  showError("タイムアウトしました。もう一度お試しください。");
+  return null;
 }
 
 function showLoading(mode) {

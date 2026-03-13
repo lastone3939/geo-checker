@@ -92,6 +92,9 @@ def log_gbp_analysis(url, business_name, score, grade, ip):
 
 init_db()
 
+# 診断ジョブ管理
+ANALYZE_JOBS = {}  # job_id -> {status, result, error, created_at}
+
 # 動画生成ジョブ管理
 VIDEO_JOBS = {}  # job_id -> {status, progress, video_path, error, created_at}
 VIDEO_DIR = Path(tempfile.gettempdir()) / "gbp_videos"
@@ -754,6 +757,63 @@ def create_slideshow_video(photo_paths: list, output_path: Path, duration: float
         return False
 
 
+def run_analyze_job(job_id: str, url: str, job_type: str):
+    """GEO/GBP診断をバックグラウンドで実行"""
+    try:
+        ANALYZE_JOBS[job_id]["status"] = "running"
+        parsed = urlparse(url)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+        if job_type == "geo":
+            html = fetch_page(url)
+            soup = BeautifulSoup(html, "html.parser")
+            robots = check_robots_txt(base_url)
+            llms_txt = check_llms_txt(base_url)
+            structured_data = extract_structured_data(soup)
+            meta = extract_meta_info(soup)
+            headings = extract_headings(soup)
+            faq = check_faq_content(soup, html)
+            site_data = {
+                "url": url, "robots": robots, "llms_txt": llms_txt,
+                "structured_data": structured_data, "meta": meta,
+                "headings": headings, "faq": faq,
+            }
+            result = analyze_with_gemini(site_data)
+            result["analyzed_url"] = url
+            log_analysis(url, result.get("overall_score"), result.get("grade"), "async")
+            ANALYZE_JOBS[job_id]["result"] = result
+            ANALYZE_JOBS[job_id]["status"] = "done"
+
+        elif job_type == "gbp":
+            business_name = extract_business_name_from_url(url)
+            html_snippet = fetch_gmaps_page(url)
+            if html_snippet:
+                soup = BeautifulSoup(html_snippet, "html.parser")
+                if not business_name and soup.title and soup.title.string:
+                    m = re.match(r"^(.+?)\s*[-–]\s*Google", soup.title.string.strip())
+                    if m:
+                        business_name = m.group(1).strip()
+            result = analyze_gbp_with_gemini(url, business_name, html_snippet)
+            result["analyzed_url"] = url
+            if not result.get("business_name") and business_name:
+                result["business_name"] = business_name
+            log_gbp_analysis(url, result.get("business_name", business_name or "不明"),
+                           result.get("overall_score"), result.get("grade"), "async")
+            ANALYZE_JOBS[job_id]["result"] = result
+            ANALYZE_JOBS[job_id]["status"] = "done"
+
+    except requests.exceptions.Timeout:
+        ANALYZE_JOBS[job_id]["status"] = "error"
+        ANALYZE_JOBS[job_id]["error"] = "サイトの取得がタイムアウトしました（10秒）"
+    except requests.exceptions.ConnectionError:
+        ANALYZE_JOBS[job_id]["status"] = "error"
+        ANALYZE_JOBS[job_id]["error"] = "サイトに接続できませんでした。URLを確認してください"
+    except Exception as e:
+        ANALYZE_JOBS[job_id]["status"] = "error"
+        ANALYZE_JOBS[job_id]["error"] = "分析中にエラーが発生しました。しばらくしてから再度お試しください"
+        app.logger.error(f"analyze job error ({job_type}): {e}")
+
+
 def run_video_job(job_id: str, url: str):
     """バックグラウンドで動画生成ジョブを実行"""
     try:
@@ -834,68 +894,39 @@ def analyze():
     if not url:
         return jsonify({"error": "URLを入力してください"}), 400
 
-    # URLの正規化
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
-    parsed = urlparse(url)
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    if not is_safe_url(url):
+        return jsonify({"error": "このURLは診断できません"}), 400
 
-    try:
-        # 1. サイト取得
-        html = fetch_page(url)
-        soup = BeautifulSoup(html, "html.parser")
+    job_id = str(uuid.uuid4())
+    ANALYZE_JOBS[job_id] = {
+        "type": "geo",
+        "url": url,
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "created_at": datetime.now().isoformat()
+    }
+    t = threading.Thread(target=run_analyze_job, args=(job_id, url, "geo"))
+    t.daemon = True
+    t.start()
 
-        # 2. robots.txtチェック
-        robots = check_robots_txt(base_url)
+    return jsonify({"job_id": job_id})
 
-        # 3. llms.txtチェック
-        llms_txt = check_llms_txt(base_url)
 
-        # 4. 構造化データ抽出
-        structured_data = extract_structured_data(soup)
-
-        # 5. メタ情報抽出
-        meta = extract_meta_info(soup)
-
-        # 6. 見出し構造抽出
-        headings = extract_headings(soup)
-
-        # 7. FAQ/Q&Aコンテンツ確認
-        faq = check_faq_content(soup, html)
-
-        # 収集データをまとめる
-        site_data = {
-            "url": url,
-            "robots": robots,
-            "llms_txt": llms_txt,
-            "structured_data": structured_data,
-            "meta": meta,
-            "headings": headings,
-            "faq": faq,
-        }
-
-        # Geminiで分析
-        result = analyze_with_gemini(site_data)
-        result["analyzed_url"] = url
-
-        # ログ記録
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-        log_analysis(url, result.get("overall_score"), result.get("grade"), ip)
-
-        return jsonify(result)
-
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "サイトの取得がタイムアウトしました（10秒）"}), 504
-    except requests.exceptions.ConnectionError:
-        return jsonify({"error": "サイトに接続できませんでした。URLを確認してください"}), 502
-    except requests.exceptions.HTTPError as e:
-        return jsonify({"error": f"サイトからエラーが返されました: {e.response.status_code}"}), 502
-    except json.JSONDecodeError:
-        return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
-    except Exception as e:
-        app.logger.error(f"analyze error: {e}")  # サーバーログのみ
-        return jsonify({"error": "分析中にエラーが発生しました。しばらくしてから再度お試しください"}), 500
+@app.route("/api/analyze-status/<job_id>")
+def analyze_status(job_id: str):
+    job = ANALYZE_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    if job["status"] == "done":
+        return jsonify({"status": "done", "result": job["result"]})
+    elif job["status"] == "error":
+        return jsonify({"status": "error", "error": job["error"]})
+    else:
+        return jsonify({"status": job["status"]})
 
 
 @app.route("/api/analyze-gbp", methods=["POST"])
@@ -923,57 +954,26 @@ def analyze_gbp():
     if not url:
         return jsonify({"error": "GoogleマップURLを入力してください"}), 400
 
-    # URLの正規化
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
-    # GoogleマップURLバリデーション
     if not validate_gbp_url(url):
         return jsonify({"error": "有効なGoogleマップURLを入力してください（maps.google.com, google.com/maps, g.page等）"}), 400
 
-    try:
-        # 1. URLからビジネス名抽出
-        business_name = extract_business_name_from_url(url)
+    job_id = str(uuid.uuid4())
+    ANALYZE_JOBS[job_id] = {
+        "type": "gbp",
+        "url": url,
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "created_at": datetime.now().isoformat()
+    }
+    t = threading.Thread(target=run_analyze_job, args=(job_id, url, "gbp"))
+    t.daemon = True
+    t.start()
 
-        # 2. ページHTML取得（限定的）
-        html_snippet = fetch_gmaps_page(url)
-
-        # 3. HTMLからメタ情報等を抽出
-        if html_snippet:
-            soup = BeautifulSoup(html_snippet, "html.parser")
-            # titleタグからビジネス名を補完
-            if not business_name and soup.title and soup.title.string:
-                title_text = soup.title.string.strip()
-                # "ビジネス名 - Google マップ" パターン
-                m = re.match(r'^(.+?)\s*[-–]\s*Google', title_text)
-                if m:
-                    business_name = m.group(1).strip()
-
-        # 4. Geminiで分析
-        result = analyze_gbp_with_gemini(url, business_name, html_snippet)
-        result["analyzed_url"] = url
-
-        # ビジネス名をレスポンスに反映
-        if not result.get("business_name") and business_name:
-            result["business_name"] = business_name
-
-        # ログ記録
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-        log_gbp_analysis(
-            url,
-            result.get("business_name", business_name or "不明"),
-            result.get("overall_score"),
-            result.get("grade"),
-            ip
-        )
-
-        return jsonify(result)
-
-    except json.JSONDecodeError:
-        return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
-    except Exception as e:
-        app.logger.error(f"analyze-gbp error: {e}")  # サーバーログのみ
-        return jsonify({"error": "分析中にエラーが発生しました。しばらくしてから再度お試しください"}), 500
+    return jsonify({"job_id": job_id})
 
 
 @app.route("/api/create-video", methods=["POST"])
