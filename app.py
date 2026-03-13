@@ -462,17 +462,32 @@ statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
+def resolve_url(url: str) -> str:
+    """短縮URLを最終URLに展開（share.google / maps.app.goo.gl 等）"""
+    short_hosts = ["share.google", "maps.app.goo.gl", "goo.gl", "g.page"]
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+    if any(host == h or host.endswith("." + h) for h in short_hosts):
+        try:
+            r = requests.get(url, allow_redirects=True, timeout=10,
+                             headers={"User-Agent": "Mozilla/5.0"})
+            return r.url
+        except Exception:
+            pass
+    return url
+
+
 def validate_gbp_url(url):
-    """GoogleマップURLのバリデーション（緩め: google系ドメインならOK）"""
+    """GoogleマップURLのバリデーション（share.google / maps.app.goo.gl も許可）"""
     parsed = urlparse(url)
     valid_hosts = [
         "maps.google.com", "www.google.com", "google.com",
         "maps.google.co.jp", "www.google.co.jp", "google.co.jp",
-        "g.page", "goo.gl",
+        "g.page", "goo.gl", "maps.app.goo.gl", "share.google",
     ]
     host = parsed.netloc.lower()
     if any(host == h or host.endswith("." + h) for h in valid_hosts):
-        return True  # google系ドメインはパス問わず許可
+        return True
     return False
 
 
@@ -679,6 +694,10 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
     if not GOOGLE_PLACES_API_KEY:
         app.logger.error("GOOGLE_PLACES_API_KEY not set")
         return []
+
+    # 短縮URL（share.google / maps.app.goo.gl）を展開
+    url = resolve_url(url)
+    app.logger.info(f"resolve後URL: {url[:100]}")
 
     place_id, query, lat, lng = get_query_from_url(url)
     photos = []
@@ -961,6 +980,7 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
             ANALYZE_JOBS[job_id]["status"] = "done"
 
         elif job_type == "gbp":
+            url = resolve_url(url)  # share.google / maps.app.goo.gl を展開
             business_name = extract_business_name_from_url(url)
             html_snippet = fetch_gmaps_page(url)
             if html_snippet:
@@ -993,6 +1013,7 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
 def run_video_job(job_id: str, url: str, sparkle: bool = False):
     """バックグラウンドで動画生成ジョブを実行"""
     try:
+        url = resolve_url(url)  # share.google / maps.app.goo.gl を展開
         VIDEO_JOBS[job_id]["status"] = "scraping"
         VIDEO_JOBS[job_id]["progress"] = 10
 
