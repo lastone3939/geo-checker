@@ -807,54 +807,62 @@ def download_photo(url: str, dest: Path) -> bool:
         return False
 
 
-def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 10.0) -> bool:
-    """FFmpegでスライドショー動画を生成（Ken Burns風ズームイン/アウト）"""
+def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 20.0) -> bool:
+    """FFmpegでスライドショー動画を生成（GBP規格: MP4 H.264 720p 最大30秒）"""
     n = len(photo_paths)
     if n == 0:
         return False
 
-    per_slide = duration / n
-    fps = 30
-    frames_per_slide = int(per_slide * fps)
-
-    # FFmpegフィルター構築
-    filter_parts = []
-    inputs = []
-
-    for i, p_path in enumerate(photo_paths):
-        inputs += ["-loop", "1", "-t", str(per_slide + 1), "-i", str(p_path)]
-        z = f"zoompan=z='if(lte(zoom,1.0),1.0,zoom-0.0008)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d={frames_per_slide}:s=1280x720:fps={fps}"
-        filter_parts.append(f"[{i}:v]{z},setpts=PTS-STARTPTS[v{i}]")
-
-    # クロスフェード結合
-    if n == 1:
-        filter_complex = filter_parts[0] + f";[v0]trim=0:{duration}[out]"
-    else:
-        filter_complex = ";".join(filter_parts)
-        prev = "v0"
-        for i in range(1, n):
-            out_label = f"xf{i}" if i < n - 1 else "out"
-            offset = per_slide * i - 0.5
-            filter_complex += f";[{prev}][v{i}]xfade=transition=fade:duration=0.5:offset={offset}[{out_label}]"
-            prev = out_label
-
-    cmd = [
-        "ffmpeg", "-y",
-        *inputs,
-        "-filter_complex", filter_complex,
-        "-map", "[out]",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-t", str(duration),
-        "-movflags", "+faststart",
-        str(output_path)
-    ]
+    total = min(duration, 28.0)
+    per_slide = round(total / n, 2)
+    fps = 25
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        return result.returncode == 0
+        # 各画像を個別セグメントに変換してからconcatで結合（最もシンプル・確実）
+        segment_paths = []
+        for i, p in enumerate(photo_paths):
+            seg = output_path.parent / f"seg_{i:03d}.mp4"
+            cmd = [
+                "ffmpeg", "-y",
+                "-loop", "1", "-i", str(p),
+                "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
+                       "pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+                "-c:v", "libx264", "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p",
+                "-t", str(per_slide),
+                "-r", str(fps),
+                str(seg),
+            ]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if r.returncode != 0:
+                app.logger.error(f"segment {i} ffmpeg error: {r.stderr[-300:]}")
+                return False
+            segment_paths.append(seg)
+
+        # concat list
+        concat_file = output_path.parent / "concat.txt"
+        with open(concat_file, "w") as f:
+            for seg in segment_paths:
+                f.write(f"file '{seg}'\n")
+
+        # 結合
+        cmd2 = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", str(concat_file),
+            "-c:v", "libx264", "-preset", "fast",
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+        r2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=120)
+        if r2.returncode != 0:
+            app.logger.error(f"concat ffmpeg error: {r2.stderr[-300:]}")
+            return False
+
+        return output_path.exists() and output_path.stat().st_size > 1000
+
     except Exception as e:
-        app.logger.error(f"ffmpeg error: {e}")
+        app.logger.error(f"create_slideshow_video error: {e}")
         return False
 
 
