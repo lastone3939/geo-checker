@@ -642,18 +642,28 @@ steps: [
 
 
 def get_query_from_url(url: str) -> tuple:
-    """Google Maps URLからビジネス名と緯度経度を抽出 → (query, lat, lng)"""
+    """Google Maps URLからPlace ID / ビジネス名 / 座標を抽出
+    戻り値: (place_id_or_none, query_string, lat, lng)
+    """
     from urllib.parse import unquote, parse_qs
+    place_id = None
     query = ""
     lat, lng = None, None
-    m = re.search(r"/place/([^/@]+)", url)
-    if m:
-        query = unquote(m.group(1)).replace("+", " ")
+    # 1. Place ID (ChIJ形式) を dataパラメータから抽出
+    pid_m = re.search(r"!1s(ChIJ[A-Za-z0-9_\-]+)", url)
+    if pid_m:
+        place_id = pid_m.group(1)
+    # 2. /place/NAME/ からビジネス名
+    name_m = re.search(r"/place/([^/@]+)", url)
+    if name_m:
+        query = unquote(name_m.group(1)).replace("+", " ")
+    # 3. ?q= パラメータ
     if not query:
         parsed_u = urlparse(url)
         qs = parse_qs(parsed_u.query)
         if "q" in qs:
             query = qs["q"][0]
+    # 4. 座標抽出
     coord_m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", url)
     if coord_m:
         lat, lng = float(coord_m.group(1)), float(coord_m.group(2))
@@ -661,7 +671,7 @@ def get_query_from_url(url: str) -> tuple:
         coord_m2 = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", url)
         if coord_m2:
             lat, lng = float(coord_m2.group(1)), float(coord_m2.group(2))
-    return query, lat, lng
+    return place_id, query, lat, lng
 
 
 def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
