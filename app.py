@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, unquote
 
 import google.generativeai as genai
 import requests
@@ -46,6 +46,17 @@ def init_db():
             created_at TEXT NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS gbp_analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            business_name TEXT,
+            score INTEGER,
+            grade TEXT,
+            ip TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -55,6 +66,19 @@ def log_analysis(url, score, grade, ip):
         conn.execute(
             "INSERT INTO analyses (url, score, grade, ip, created_at) VALUES (?,?,?,?,?)",
             (url, score, grade, ip, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def log_gbp_analysis(url, business_name, score, grade, ip):
+    """GBP分析ログを記録"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO gbp_analyses (url, business_name, score, grade, ip, created_at) VALUES (?,?,?,?,?,?)",
+            (url, business_name, score, grade, ip, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         )
         conn.commit()
         conn.close()
@@ -386,6 +410,232 @@ statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
     raise last_error
 
 
+def validate_gbp_url(url):
+    """GoogleマップURLのバリデーション"""
+    parsed = urlparse(url)
+    valid_hosts = [
+        "maps.google.com", "www.google.com", "google.com",
+        "maps.google.co.jp", "www.google.co.jp", "google.co.jp",
+        "g.page", "goo.gl",
+    ]
+    host = parsed.netloc.lower()
+    if any(host == h or host.endswith("." + h) for h in valid_hosts):
+        # google.com系はpathに/mapsが含まれるか、cidパラメータがあるか確認
+        if "google" in host:
+            if "/maps" in parsed.path or "cid=" in (parsed.query or "") or "place" in parsed.path:
+                return True
+        else:
+            return True
+    return False
+
+
+def extract_business_name_from_url(url):
+    """GoogleマップURLからビジネス名を抽出"""
+    parsed = urlparse(url)
+    path = unquote(parsed.path)
+    # /maps/place/ビジネス名/... パターン
+    m = re.search(r'/place/([^/@]+)', path)
+    if m:
+        name = m.group(1).replace('+', ' ')
+        return name
+    return None
+
+
+def fetch_gmaps_page(url):
+    """GoogleマップページのHTML断片を取得（限定的）"""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        html = resp.text[:50000]
+        return html
+    except Exception:
+        return ""
+
+
+def analyze_gbp_with_gemini(url, business_name, html_snippet, retries=3, backoff=2):
+    """GBP分析用Geminiプロンプト"""
+    prompt = f"""あなたはGoogleビジネスプロフィール（GBP）とローカルSEOの専門家です。
+以下のGoogleマップURLとそこから取得できた情報を基に、GBPの最適化状況を分析してください。
+
+## 分析対象
+GoogleマップURL: {url}
+ビジネス名（URLから抽出）: {business_name or '不明'}
+
+## 取得できたHTML断片（参考情報）
+{html_snippet[:5000] if html_snippet else 'HTML取得不可（JSレンダリングのため限定的）'}
+
+## 重要な指示
+- GoogleマップページはJavaScriptでレンダリングされるため、HTMLからの情報は限定的です
+- あなたの知識ベースにあるこのビジネスの情報や、GBP最適化のベストプラクティスを組み合わせて分析してください
+- URLとビジネス名から推測できる業種・業態に基づいて、具体的かつ実践的な改善提案を行ってください
+- 情報が不足している場合は、一般的なGBP最適化のベストプラクティスに基づいて診断してください
+
+## 評価カテゴリ（各0〜100点）
+
+1. **profile_completeness**（プロフィール完成度）: ビジネス名、カテゴリ、住所、電話番号、営業時間、Webサイト、説明文の充実度
+2. **photos_videos**（写真・動画）: 写真数・品質・多様性（外観・内観・商品・スタッフ）
+3. **reviews_management**（クチコミ管理）: クチコミ数、平均評価、オーナー返信率と質
+4. **posts_activity**（投稿活動）: 投稿頻度、投稿タイプの多様性（最新情報・特典・イベント）
+5. **qa_section**（Q&A管理）: Q&Aの有無、ビジネスによる先行Q&A設置
+6. **local_seo**（ローカルSEO）: カテゴリ選択最適化、キーワード、属性・サービス設定
+
+## 採点ルール
+- 辛口で採点すること（甘くしない）
+- URLから直接確認できない項目は、一般的な中小ビジネスの平均的な状態を想定して採点
+- overall_scoreは6カテゴリの均等平均
+- gradeはoverall_scoreに基づく: 90〜=A+, 80〜89=A, 70〜79=B, 60〜69=C, 50〜59=D, 〜49=F
+- statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
+
+必ず以下のJSON形式のみで回答してください（説明文なし、JSONのみ）:
+{{
+  "overall_score": 65,
+  "grade": "C",
+  "business_name": "ビジネス名（推定含む）",
+  "summary": "全体評価（2〜3文の日本語）",
+  "gbp_news": "2026年3月にGoogleがGemini搭載「Ask Maps」とImmersive Navigationを発表。月間20億人のGoogle MapsがAI会話型に大刷新。GBP最適化の重要性がさらに増しています。",
+  "categories": {{
+    "profile_completeness": {{
+      "score": 70,
+      "title": "プロフィール完成度",
+      "status": "good",
+      "detail": "詳細説明（日本語）",
+      "recommendations": ["改善案1", "改善案2"]
+    }},
+    "photos_videos": {{
+      "score": 40,
+      "title": "写真・動画",
+      "status": "bad",
+      "detail": "詳細説明",
+      "recommendations": ["改善案1"]
+    }},
+    "reviews_management": {{
+      "score": 55,
+      "title": "クチコミ管理",
+      "status": "warning",
+      "detail": "詳細説明",
+      "recommendations": ["改善案1"]
+    }},
+    "posts_activity": {{
+      "score": 30,
+      "title": "投稿活動",
+      "status": "bad",
+      "detail": "詳細説明",
+      "recommendations": ["改善案1"]
+    }},
+    "qa_section": {{
+      "score": 20,
+      "title": "Q&A管理",
+      "status": "bad",
+      "detail": "詳細説明",
+      "recommendations": ["改善案1"]
+    }},
+    "local_seo": {{
+      "score": 60,
+      "title": "ローカルSEO",
+      "status": "warning",
+      "detail": "詳細説明",
+      "recommendations": ["改善案1"]
+    }}
+  }},
+  "top_actions": [
+    {{ "priority": "high", "action": "最も効果の高い具体的アクション" }},
+    {{ "priority": "high", "action": "2番目に効果の高い具体的アクション" }},
+    {{ "priority": "medium", "action": "具体的アクション" }}
+  ],
+  "practical_guide": {{
+    "quick_wins": [
+      {{
+        "title": "今日できること（具体的タスク名）",
+        "steps": ["手順1（具体的に）", "手順2"],
+        "impact": "high"
+      }}
+    ],
+    "gbp_post_sample": "そのビジネスに合わせたGBP投稿文サンプル（300文字程度、絵文字・ハッシュタグ付き）。投稿タイプ（最新情報/特典/イベント）も明示。",
+    "response_template": "クチコミ返信テンプレート。ポジティブ返信例とネガティブ返信例の両方を含める。ビジネスの業種に合わせた具体的な内容にする。"
+  }}
+}}
+
+## practical_guideの生成ルール（★超重要★）
+
+### quick_wins の stepsは以下のレベルで具体的に書くこと:
+実際の操作画面・ボタン名・入力内容を含める。「〜する」ではなく「〜を押す」「〜と入力する」レベルで。
+
+例（写真追加の場合）:
+steps: [
+  "ブラウザで business.google.com を開いてログイン",
+  "左メニュー「写真」→「写真を追加」ボタンをクリック",
+  "外観写真3枚・店内写真3枚・商品/メニュー写真5枚以上をアップロード",
+  "写真のファイル名を「店名_外観01.jpg」のように日本語+番号にしてから保存",
+  "カバー写真には最も明るく魅力的な外観写真を設定"
+]
+
+例（クチコミ返信の場合）:
+steps: [
+  "business.google.com にログイン→「クチコミ」タブを開く",
+  "「返信する」ボタンが表示されている未返信クチコミをすべて確認",
+  "★4-5のクチコミには24時間以内に返信（下のテンプレートをコピペ可）",
+  "★1-3のクチコミには謝罪・改善策・連絡先を含む返信を48時間以内に投稿",
+  "今後は毎週月曜に返信チェックをカレンダーに登録する"
+]
+
+例（GBP投稿の場合）:
+steps: [
+  "business.google.com にログイン→「投稿を追加」ボタンをクリック",
+  "投稿タイプ「最新情報」を選択",
+  "下のサンプルテキストをコピーして編集（業種・日付・内容を書き換え）",
+  "写真1枚以上を添付（600×900px推奨、スマホで撮影してもOK）",
+  "「公開」ボタンを押して投稿完了→月2〜4回のペースで継続"
+]
+
+- quick_wins: 必ず2〜3個。各タスクは30分以内で完了できるもの。stepsは上記例のように5ステップ程度の詳細な手順。
+- gbp_post_sample: そのビジネスの業種・地域に合わせた具体的な投稿文（300文字以内）。絵文字・ハッシュタグあり。投稿タイプ明示。「コピーしてそのまま使える」レベルで。
+- response_template: ポジティブ（★4-5）・ネガティブ（★1-2）両パターン。「お客様のお名前」等のプレースホルダー形式で記述。業種に合わせた言葉遣い。
+"""
+    last_error = None
+    for attempt in range(retries):
+        try:
+            response = model.generate_content(
+                prompt,
+                request_options={"timeout": 60},
+            )
+            text = response.text.strip()
+
+            # JSONブロック抽出
+            m = re.search(r'```json\s*([\s\S]*?)```', text)
+            if m:
+                text = m.group(1).strip()
+            else:
+                m = re.search(r'```\s*([\s\S]*?)```', text)
+                if m:
+                    text = m.group(1).strip()
+
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                start = text.find('{')
+                end = text.rfind('}')
+                if start != -1 and end != -1:
+                    return json.loads(text[start:end+1])
+                raise
+
+        except Exception as e:
+            err_str = str(e)
+            last_error = e
+            if any(kw in err_str for kw in ("429", "quota", "RESOURCE_EXHAUSTED", "overloaded", "503")):
+                if attempt < retries - 1:
+                    time.sleep(backoff * (attempt + 1))
+                    continue
+                raise RuntimeError("APIの利用制限に達しました。しばらく待ってから再度お試しください。") from e
+            if any(kw in err_str for kw in ("401", "403", "API_KEY", "invalid", "INVALID_ARGUMENT")):
+                raise RuntimeError("APIキーが無効です。管理者にお問い合わせください。") from e
+            if attempt < retries - 1:
+                time.sleep(backoff)
+                continue
+            raise
+
+    raise last_error
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -475,47 +725,147 @@ def analyze():
         return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
 
 
+@app.route("/api/analyze-gbp", methods=["POST"])
+@limiter.limit("5 per minute;20 per hour;50 per day")
+def analyze_gbp():
+    """GBP（Googleビジネスプロフィール）診断API"""
+    # 日次上限チェック
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        today = datetime.now().strftime("%Y-%m-%d")
+        count_web = conn.execute(
+            "SELECT COUNT(*) FROM analyses WHERE created_at LIKE ?", (f"{today}%",)
+        ).fetchone()[0]
+        count_gbp = conn.execute(
+            "SELECT COUNT(*) FROM gbp_analyses WHERE created_at LIKE ?", (f"{today}%",)
+        ).fetchone()[0]
+        conn.close()
+        if (count_web + count_gbp) >= DAILY_LIMIT:
+            return jsonify({"error": "本日の分析上限（{}件）に達しました。明日またお試しください。".format(DAILY_LIMIT)}), 429
+    except Exception:
+        pass
+
+    data = request.get_json()
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "GoogleマップURLを入力してください"}), 400
+
+    # URLの正規化
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    # GoogleマップURLバリデーション
+    if not validate_gbp_url(url):
+        return jsonify({"error": "有効なGoogleマップURLを入力してください（maps.google.com, google.com/maps, g.page等）"}), 400
+
+    try:
+        # 1. URLからビジネス名抽出
+        business_name = extract_business_name_from_url(url)
+
+        # 2. ページHTML取得（限定的）
+        html_snippet = fetch_gmaps_page(url)
+
+        # 3. HTMLからメタ情報等を抽出
+        if html_snippet:
+            soup = BeautifulSoup(html_snippet, "html.parser")
+            # titleタグからビジネス名を補完
+            if not business_name and soup.title and soup.title.string:
+                title_text = soup.title.string.strip()
+                # "ビジネス名 - Google マップ" パターン
+                m = re.match(r'^(.+?)\s*[-–]\s*Google', title_text)
+                if m:
+                    business_name = m.group(1).strip()
+
+        # 4. Geminiで分析
+        result = analyze_gbp_with_gemini(url, business_name, html_snippet)
+        result["analyzed_url"] = url
+
+        # ビジネス名をレスポンスに反映
+        if not result.get("business_name") and business_name:
+            result["business_name"] = business_name
+
+        # ログ記録
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        log_gbp_analysis(
+            url,
+            result.get("business_name", business_name or "不明"),
+            result.get("overall_score"),
+            result.get("grade"),
+            ip
+        )
+
+        return jsonify(result)
+
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI分析結果の解析に失敗しました。もう一度お試しください"}), 500
+    except Exception as e:
+        return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
+
+
 @app.route("/admin/logs")
 def admin_logs():
     token = request.args.get("token", "")
     if token != ADMIN_TOKEN:
         abort(403)
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute(
+    # Web診断ログ
+    web_rows = conn.execute(
         "SELECT id, url, score, grade, ip, created_at FROM analyses ORDER BY id DESC LIMIT 200"
     ).fetchall()
+    # GBP診断ログ
+    gbp_rows = conn.execute(
+        "SELECT id, url, business_name, score, grade, ip, created_at FROM gbp_analyses ORDER BY id DESC LIMIT 200"
+    ).fetchall()
     conn.close()
-    total = len(rows)
-    avg = round(sum(r[2] for r in rows if r[2]) / total, 1) if total else 0
+    web_total = len(web_rows)
+    web_avg = round(sum(r[2] for r in web_rows if r[2]) / web_total, 1) if web_total else 0
+    gbp_total = len(gbp_rows)
+    gbp_avg = round(sum(r[3] for r in gbp_rows if r[3]) / gbp_total, 1) if gbp_total else 0
     html = f"""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
-<title>GEOチェッカー 管理ログ</title>
+<title>AI検索GBP改善君 管理ログ</title>
 <style>
-body{{font-family:'Noto Sans JP',sans-serif;background:#F8FAFC;color:#111;padding:2rem}}
-h1{{font-size:1.5rem;font-weight:700;margin-bottom:1rem}}
-.stats{{display:flex;gap:1.5rem;margin-bottom:1.5rem}}
-.stat{{background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:1rem 1.5rem}}
-.stat-num{{font-size:2rem;font-weight:800;color:#2563EB}}
-.stat-label{{font-size:.85rem;color:#6B7280}}
-table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
-th{{background:#F1F5F9;padding:.75rem 1rem;text-align:left;font-size:.85rem;color:#374151}}
-td{{padding:.75rem 1rem;border-top:1px solid #F1F5F9;font-size:.9rem}}
+body{{font-family:'Noto Sans JP',sans-serif;background:#F8F9FA;color:#202124;padding:2rem}}
+h1{{font-size:1.5rem;font-weight:700;margin-bottom:1rem;color:#1A73E8}}
+h2{{font-size:1.2rem;font-weight:700;margin:2rem 0 1rem;color:#202124}}
+.stats{{display:flex;gap:1.5rem;margin-bottom:1.5rem;flex-wrap:wrap}}
+.stat{{background:#fff;border:1px solid #E8EAED;border-radius:8px;padding:1rem 1.5rem}}
+.stat-num{{font-size:2rem;font-weight:800;color:#1A73E8}}
+.stat-num.green{{color:#34A853}}
+.stat-label{{font-size:.85rem;color:#5F6368}}
+table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:2rem}}
+th{{background:#F1F3F4;padding:.75rem 1rem;text-align:left;font-size:.85rem;color:#3C4043}}
+td{{padding:.75rem 1rem;border-top:1px solid #F1F3F4;font-size:.9rem}}
 .grade{{font-weight:700;padding:.2rem .5rem;border-radius:4px;font-size:.85rem}}
-.A{{background:#DCFCE7;color:#16A34A}}.B{{background:#FEF9C3;color:#CA8A04}}
-.C,.D{{background:#FEE2E2;color:#DC2626}}.F{{background:#111;color:#fff}}
+.A{{background:#E6F4EA;color:#34A853}}.B{{background:#FEF7E0;color:#FBBC04}}
+.C,.D{{background:#FCE8E6;color:#EA4335}}.F{{background:#202124;color:#fff}}
 </style></head><body>
-<h1>📊 GEOチェッカー 分析ログ</h1>
+<h1>AI検索GBP改善君 管理ログ</h1>
 <div class="stats">
-  <div class="stat"><div class="stat-num">{total}</div><div class="stat-label">総分析数</div></div>
-  <div class="stat"><div class="stat-num">{avg}</div><div class="stat-label">平均スコア</div></div>
+  <div class="stat"><div class="stat-num">{web_total}</div><div class="stat-label">Web診断数</div></div>
+  <div class="stat"><div class="stat-num">{web_avg}</div><div class="stat-label">Web平均スコア</div></div>
+  <div class="stat"><div class="stat-num green">{gbp_total}</div><div class="stat-label">GBP診断数</div></div>
+  <div class="stat"><div class="stat-num green">{gbp_avg}</div><div class="stat-label">GBP平均スコア</div></div>
 </div>
+
+<h2>Webサイト診断ログ</h2>
 <table>
 <tr><th>#</th><th>URL</th><th>スコア</th><th>グレード</th><th>IP</th><th>日時</th></tr>
 """
-    for r in rows:
+    for r in web_rows:
         rid, url, score, grade, ip, created_at = r
         grade_cls = (grade or "F")[0]
         html += f'<tr><td>{rid}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
+    html += """</table>
+
+<h2>GBP診断ログ</h2>
+<table>
+<tr><th>#</th><th>URL</th><th>ビジネス名</th><th>スコア</th><th>グレード</th><th>IP</th><th>日時</th></tr>
+"""
+    for r in gbp_rows:
+        rid, url, bname, score, grade, ip, created_at = r
+        grade_cls = (grade or "F")[0]
+        html += f'<tr><td>{rid}</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{bname or "-"}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
     html += "</table></body></html>"
     return html
 

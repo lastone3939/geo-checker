@@ -3,28 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GEOチェッカー - AI検索最適化スコア診断</title>
+  <title>AI検索GBP改善君 - Googleマップ × AI検索 最適化診断ツール</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
   <style>
     :root {
-      --bg: #F8FAFC;
+      --bg: #F8F9FA;
       --surface: #FFFFFF;
-      --border: #E2E8F0;
-      --text: #111827;
-      --text-sub: #6B7280;
-      --primary: #2563EB;
-      --primary-light: #EFF6FF;
-      --good: #16A34A;
-      --good-bg: #F0FDF4;
-      --warn: #D97706;
-      --warn-bg: #FFFBEB;
-      --bad: #DC2626;
-      --bad-bg: #FEF2F2;
-      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md: 0 4px 6px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+      --border: #E8EAED;
+      --text: #202124;
+      --text-sub: #5F6368;
+      --primary: #1A73E8;
+      --primary-light: #E8F0FE;
+      --secondary: #34A853;
+      --secondary-light: #E6F4EA;
+      --accent: #FBBC04;
+      --accent-light: #FEF7E0;
+      --danger: #EA4335;
+      --danger-light: #FCE8E6;
+      --good: #34A853;
+      --good-bg: #E6F4EA;
+      --warn: #FBBC04;
+      --warn-bg: #FEF7E0;
+      --bad: #EA4335;
+      --bad-bg: #FCE8E6;
+      --shadow: 0 1px 3px rgba(60,64,67,0.15), 0 1px 2px rgba(60,64,67,0.10);
+      --shadow-md: 0 4px 8px rgba(60,64,67,0.15), 0 2px 4px rgba(60,64,67,0.10);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,46 +46,129 @@
 
     /* ヘッダー */
     .site-header {
-      padding: 16px 24px;
+      padding: 14px 24px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
     .site-header .logo {
-      font-size: 28px;
+      font-size: 22px;
       font-weight: 800;
       color: var(--text);
       letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .site-header .logo span {
-      color: var(--primary);
+    .site-header .logo .logo-icon {
+      font-size: 26px;
+    }
+    .site-header .logo .blue { color: var(--primary); }
+    .site-header .logo .green { color: var(--secondary); }
+    .site-header .logo .yellow { color: var(--accent); }
+    .site-header .logo .red { color: var(--danger); }
+    .site-header .subtitle {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-weight: 500;
     }
 
-    /* ヒーロー */
-    .hero {
+    /* ニュースバナー */
+    .news-banner {
+      background: linear-gradient(135deg, #E8F0FE 0%, #E6F4EA 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 80px 24px 60px;
-      min-height: calc(100vh - 53px);
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.6;
     }
-    .hero h1 {
-      font-size: clamp(24px, 5vw, 36px);
+    .news-banner .news-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .news-banner .news-date {
+      background: var(--primary);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .news-banner .news-text {
+      flex: 1;
+    }
+    .news-banner .news-text strong {
+      font-weight: 700;
+    }
+    @media (max-width: 600px) {
+      .news-banner { flex-wrap: wrap; font-size: 12px; }
+    }
+
+    /* タブUI */
+    .tab-container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-top: 32px;
+      border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 14px 16px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: "Noto Sans JP", sans-serif;
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .tab-content {
+      display: none;
+      padding: 32px 0 60px;
+    }
+    .tab-content.active { display: block; }
+
+    /* ヒーロー（タブ内） */
+    .tab-hero {
+      text-align: center;
+    }
+    .tab-hero h2 {
+      font-size: clamp(22px, 4vw, 30px);
       font-weight: 800;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.02em;
       line-height: 1.4;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       color: var(--text);
     }
-    .hero .sub {
-      font-size: 15px;
+    .tab-hero .sub {
+      font-size: 14px;
       color: var(--text-sub);
       line-height: 1.8;
-      max-width: 520px;
-      margin: 0 auto 36px;
+      max-width: 480px;
+      margin: 0 auto 28px;
     }
-    .hero .sub strong {
+    .tab-hero .sub strong {
       color: var(--text);
       font-weight: 600;
     }
@@ -90,6 +179,7 @@
       gap: 8px;
       max-width: 520px;
       width: 100%;
+      margin: 0 auto;
     }
     .url-input {
       flex: 1;
@@ -105,11 +195,9 @@
     .url-input:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
     }
-    .url-input::placeholder {
-      color: #9CA3AF;
-    }
+    .url-input::placeholder { color: #9AA0A6; }
     .submit-btn {
       padding: 14px 24px;
       background: var(--primary);
@@ -123,13 +211,32 @@
       white-space: nowrap;
       transition: background 0.2s;
     }
-    .submit-btn:hover { background: #1D4ED8; }
-    .submit-btn:active { background: #1E40AF; }
+    .submit-btn:hover { background: #1557B0; }
+    .submit-btn:active { background: #174EA6; }
     .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .submit-btn.gbp-btn {
+      background: var(--secondary);
+    }
+    .submit-btn.gbp-btn:hover { background: #2D9249; }
+    .submit-btn.gbp-btn:active { background: #268B3E; }
 
     @media (max-width: 540px) {
       .form-wrap { flex-direction: column; }
       .submit-btn { width: 100%; }
+    }
+
+    /* URLヒント */
+    .url-hint {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-sub);
+      text-align: center;
+    }
+    .url-hint code {
+      background: #F1F3F4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 11px;
     }
 
     /* ローディング */
@@ -138,7 +245,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 60vh;
+      min-height: 50vh;
       text-align: center;
       padding: 40px 24px;
     }
@@ -171,12 +278,12 @@
     .error-section.active { display: block; }
     .error-card {
       background: var(--bad-bg);
-      border: 1px solid #FECACA;
+      border: 1px solid #F5C6CB;
       border-radius: 10px;
       padding: 24px;
     }
     .error-card .title { font-weight: 700; color: var(--bad); margin-bottom: 8px; }
-    .error-card .msg { font-size: 14px; color: #991B1B; line-height: 1.7; }
+    .error-card .msg { font-size: 14px; color: #C5221F; line-height: 1.7; }
     .error-card .back-btn {
       margin-top: 16px;
       padding: 8px 16px;
@@ -199,12 +306,12 @@
     }
     .result-section.active { display: block; }
 
-    /* 完了ヘッダー */
+    /* 結果ヘッダー */
     .result-header {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 32px;
+      margin-bottom: 24px;
     }
     .result-header .site-url {
       font-size: 15px;
@@ -215,39 +322,100 @@
       font-size: 12px;
       color: var(--text-sub);
     }
+    .result-type-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .badge-web { background: var(--primary-light); color: var(--primary); }
+    .badge-gbp { background: var(--secondary-light); color: var(--secondary); }
 
-    /* 総合スコアカード */
+    /* GBPニュース（結果内） */
+    .gbp-news-card {
+      background: linear-gradient(135deg, #E8F0FE 0%, #E6F4EA 100%);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .gbp-news-card .news-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* 総合スコアカード（円形ゲージ） */
     .score-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px;
+      border-radius: 14px;
+      padding: 36px;
       text-align: center;
       box-shadow: var(--shadow);
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
     .score-card .label {
       font-size: 13px;
       font-weight: 600;
       color: var(--text-sub);
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
-    .score-big {
-      font-size: 72px;
+    .score-gauge {
+      position: relative;
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 16px;
+    }
+    .score-gauge svg {
+      width: 160px;
+      height: 160px;
+      transform: rotate(-90deg);
+    }
+    .score-gauge .gauge-bg {
+      fill: none;
+      stroke: #F1F3F4;
+      stroke-width: 10;
+    }
+    .score-gauge .gauge-fill {
+      fill: none;
+      stroke: var(--primary);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 408;
+      stroke-dashoffset: 408;
+      transition: stroke-dashoffset 1.2s ease-out;
+    }
+    .score-gauge .gauge-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .score-gauge .score-big {
+      font-size: 48px;
       font-weight: 800;
       line-height: 1;
       letter-spacing: -0.04em;
       color: var(--primary);
     }
-    .score-max {
-      font-size: 20px;
+    .score-gauge .score-max {
+      font-size: 14px;
       font-weight: 500;
-      color: #9CA3AF;
-      margin-left: 4px;
+      color: #9AA0A6;
+      display: block;
+      margin-top: 4px;
     }
     .grade-badge {
       display: inline-block;
-      margin-top: 12px;
       padding: 4px 16px;
       border-radius: 6px;
       font-size: 14px;
@@ -255,13 +423,18 @@
       background: var(--primary-light);
       color: var(--primary);
     }
+    .score-card .summary-text {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.8;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
 
     /* セパレータ */
-    .sep {
-      height: 1px;
-      background: var(--border);
-      margin: 32px 0;
-    }
+    .sep { height: 1px; background: var(--border); margin: 28px 0; }
 
     /* セクション見出し */
     .section-title {
@@ -271,63 +444,21 @@
       margin-bottom: 16px;
     }
 
-    /* 5指標バー */
-    .metrics-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .metric-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .metric-icon {
-      font-size: 18px;
-      flex-shrink: 0;
-      width: 28px;
-      text-align: center;
-    }
-    .metric-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      width: 160px;
-      flex-shrink: 0;
-    }
-    .metric-bar-wrap {
-      flex: 1;
-      height: 8px;
-      background: #F1F5F9;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .metric-bar-fill {
-      height: 100%;
-      border-radius: 4px;
-      width: 0%;
-      transition: width 1s ease;
-    }
-    .metric-score {
-      font-size: 14px;
-      font-weight: 700;
-      width: 32px;
-      text-align: right;
-      flex-shrink: 0;
-    }
-    .metric-badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-      flex-shrink: 0;
-    }
+    /* 指標バー */
+    .metrics-grid { display: flex; flex-direction: column; gap: 14px; }
+    .metric-row { display: flex; align-items: center; gap: 10px; }
+    .metric-icon { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
+    .metric-name { font-size: 13px; font-weight: 600; color: var(--text); width: 150px; flex-shrink: 0; }
+    .metric-bar-wrap { flex: 1; height: 8px; background: #F1F3F4; border-radius: 4px; overflow: hidden; }
+    .metric-bar-fill { height: 100%; border-radius: 4px; width: 0%; transition: width 1s ease; }
+    .metric-score { font-size: 14px; font-weight: 700; width: 32px; text-align: right; flex-shrink: 0; }
+    .metric-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
     .badge-good { background: var(--good-bg); color: var(--good); }
     .badge-warn { background: var(--warn-bg); color: var(--warn); }
     .badge-bad { background: var(--bad-bg); color: var(--bad); }
 
     @media (max-width: 540px) {
-      .metric-name { width: 110px; font-size: 13px; }
+      .metric-name { width: 100px; font-size: 12px; }
     }
 
     /* 詳細カード */
@@ -335,34 +466,34 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 24px;
+      padding: 20px;
       box-shadow: var(--shadow);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .detail-card .card-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .detail-card .card-title {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
     }
     .detail-card .card-score {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 800;
       letter-spacing: -0.02em;
     }
     .detail-card .card-bar-wrap {
-      height: 6px;
-      background: #F1F5F9;
+      height: 5px;
+      background: #F1F3F4;
       border-radius: 3px;
       overflow: hidden;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .detail-card .card-bar-fill {
       height: 100%;
@@ -371,16 +502,16 @@
       transition: width 1s ease;
     }
     .detail-card .card-detail {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-sub);
       line-height: 1.8;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .detail-card .recs { list-style: none; padding: 0; }
     .detail-card .recs li {
       font-size: 13px;
       color: var(--text-sub);
-      padding: 4px 0;
+      padding: 3px 0;
       display: flex;
       align-items: flex-start;
       gap: 8px;
@@ -397,7 +528,7 @@
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      padding: 14px 16px;
+      padding: 12px 14px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -414,39 +545,23 @@
     .p-high { background: var(--bad-bg); color: var(--bad); }
     .p-medium { background: var(--warn-bg); color: var(--warn); }
     .p-low { background: var(--good-bg); color: var(--good); }
-    .action-text {
-      font-size: 14px;
-      color: var(--text);
-      line-height: 1.6;
-    }
+    .action-text { font-size: 13px; color: var(--text); line-height: 1.6; }
 
     /* 実践ガイド */
     .practical-guide {
-      background: #F1F5F9;
+      background: #F1F3F4;
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 24px;
-      margin-bottom: 12px;
+      padding: 20px;
+      margin-bottom: 10px;
     }
-    .practical-guide .guide-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 20px;
-    }
-    .practical-guide .guide-block {
-      margin-bottom: 20px;
-    }
-    .practical-guide .guide-block:last-child {
-      margin-bottom: 0;
-    }
-    .practical-guide .guide-block-title {
-      font-size: 14px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
+    .practical-guide .guide-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    .practical-guide .guide-block { margin-bottom: 18px; }
+    .practical-guide .guide-block:last-child { margin-bottom: 0; }
+    .practical-guide .guide-block-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
     .practical-guide pre {
-      background: #1E293B;
-      color: #E2E8F0;
+      background: #202124;
+      color: #E8EAED;
       padding: 16px;
       border-radius: 8px;
       font-family: "SF Mono", "Fira Code", monospace;
@@ -463,7 +578,7 @@
       right: 8px;
       padding: 4px 10px;
       background: rgba(255,255,255,0.15);
-      color: #E2E8F0;
+      color: #E8EAED;
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 4px;
       font-size: 11px;
@@ -472,14 +587,11 @@
       font-family: "Noto Sans JP", sans-serif;
     }
     .copy-code-btn:hover { background: rgba(255,255,255,0.25); }
-    .practical-guide .faq-list {
-      list-style: none;
-      padding: 0;
-    }
+    .practical-guide .faq-list { list-style: none; padding: 0; }
     .practical-guide .faq-list li {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text);
-      padding: 6px 0;
+      padding: 5px 0;
       line-height: 1.6;
     }
     .practical-guide .faq-list li::before {
@@ -491,7 +603,7 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 14px 16px;
+      padding: 12px 14px;
       margin-bottom: 8px;
     }
     .quick-win-item .qw-header {
@@ -500,24 +612,22 @@
       gap: 8px;
       margin-bottom: 8px;
     }
-    .quick-win-item .qw-title {
-      font-size: 14px;
-      font-weight: 700;
-    }
-    .quick-win-item .qw-impact {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-    .quick-win-item ol {
-      padding-left: 20px;
-      margin: 0;
-    }
-    .quick-win-item ol li {
+    .quick-win-item .qw-title { font-size: 13px; font-weight: 700; }
+    .quick-win-item .qw-impact { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+    .quick-win-item ol { padding-left: 20px; margin: 0; }
+    .quick-win-item ol li { font-size: 12px; color: var(--text-sub); line-height: 1.7; }
+
+    /* GBP投稿サンプル・返信テンプレート */
+    .guide-text-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
       font-size: 13px;
-      color: var(--text-sub);
-      line-height: 1.7;
+      line-height: 1.8;
+      color: var(--text);
+      white-space: pre-wrap;
+      position: relative;
     }
 
     /* アクションボタン群 */
@@ -525,7 +635,7 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin-top: 32px;
+      margin-top: 28px;
     }
     .action-btns button {
       padding: 10px 20px;
@@ -536,78 +646,109 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    .btn-copy {
-      background: var(--primary);
-      color: #fff;
-      border: none;
-    }
-    .btn-copy:hover { background: #1D4ED8; }
-    .btn-retry {
-      background: var(--surface);
-      color: var(--text-sub);
-      border: 1px solid var(--border);
-    }
-    .btn-retry:hover { background: #F1F5F9; }
+    .btn-copy { background: var(--primary); color: #fff; border: none; }
+    .btn-copy:hover { background: #1557B0; }
+    .btn-retry { background: var(--surface); color: var(--text-sub); border: 1px solid var(--border); }
+    .btn-retry:hover { background: #F1F3F4; }
 
     /* フェードアップ */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .fade-up {
-      animation: fadeUp 0.5s ease-out forwards;
-      opacity: 0;
-    }
+    .fade-up { animation: fadeUp 0.5s ease-out forwards; opacity: 0; }
 
     .hidden { display: none !important; }
+
+    /* フッター */
+    .site-footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 12px;
+      color: var(--text-sub);
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
   </style>
 </head>
 <body>
 
   <!-- ヘッダー -->
   <header class="site-header">
-    <div class="logo">GEO<span>チェッカー</span></div>
+    <div class="logo">
+      <span class="logo-icon">🗺️</span>
+      <span><span class="blue">AI</span>検索<span class="green">GBP</span>改善君</span>
+    </div>
+    <span class="subtitle">Googleマップ × AI検索 最適化診断</span>
   </header>
 
-  <!-- ヒーロー -->
-  <section id="heroSection" class="hero">
-    <dotlottie-player
-      src="https://assets-v2.lottiefiles.com/a/e88e947e-117e-11ee-b32b-1f49352a17f5/h9q2N827xF.lottie"
-      background="transparent"
-      speed="1"
-      loop autoplay
-      style="width: 280px; height: 280px; margin-bottom: 12px;"
-    ></dotlottie-player>
-    <p style="font-size: 14px; color: var(--text-sub); margin-bottom: 24px; font-weight: 500;">AIのことならネコに聞け🐱</p>
+  <!-- GBP最新ニュースバナー -->
+  <div class="news-banner">
+    <span class="news-icon">🗺️</span>
+    <span class="news-date">2026/3/12</span>
+    <span class="news-text">
+      <strong>Google Maps 大型刷新</strong> — Gemini搭載「Ask Maps」とImmersive Navigationが米国でロールアウト開始。AI会話型マップへ進化。<strong>GBP最適化の重要性がさらに増しています。</strong>
+    </span>
+  </div>
 
-    <h1>あなたのサイトは<br>AIに見えていますか？</h1>
-    <p class="sub">
-      URLを入力するだけ。登録不要・完全無料で<br>
-      <strong>ChatGPT・Claude・Perplexity</strong>への最適化スコアを診断。
-    </p>
+  <!-- メインコンテンツ（タブ付きフォーム） -->
+  <section id="mainSection">
+    <div class="tab-container">
+      <!-- タブ -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="web" onclick="switchTab('web')">🌐 Webサイト診断</button>
+        <button class="tab-btn" data-tab="gbp" onclick="switchTab('gbp')">📍 GBPマップ診断</button>
+      </div>
 
-    <form id="analyzeForm" class="form-wrap">
-      <input
-        type="text" id="urlInput"
-        class="url-input"
-        placeholder="https://example.com を入力..."
-        autocomplete="url"
-      >
-      <button type="submit" id="submitBtn" class="submit-btn">診断する →</button>
-    </form>
+      <!-- Webサイト診断タブ -->
+      <div id="tabWeb" class="tab-content active">
+        <div class="tab-hero">
+          <dotlottie-player
+            src="https://assets-v2.lottiefiles.com/a/e88e947e-117e-11ee-b32b-1f49352a17f5/h9q2N827xF.lottie"
+            background="transparent" speed="1" loop autoplay
+            style="width: 200px; height: 200px; margin: 0 auto 8px;"
+          ></dotlottie-player>
+          <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 20px; font-weight: 500;">AIのことならネコに聞け🐱</p>
+          <h2>あなたのサイトは<br>AIに見えていますか？</h2>
+          <p class="sub">
+            URLを入力するだけ。登録不要・完全無料で<br>
+            <strong>ChatGPT・Claude・Perplexity</strong>への最適化スコアを診断。
+          </p>
+          <form id="webForm" class="form-wrap">
+            <input type="text" id="webUrlInput" class="url-input" placeholder="https://example.com を入力..." autocomplete="url">
+            <button type="submit" id="webSubmitBtn" class="submit-btn">診断する →</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- GBP診断タブ -->
+      <div id="tabGbp" class="tab-content">
+        <div class="tab-hero">
+          <div style="font-size: 80px; margin-bottom: 12px;">📍</div>
+          <h2>Googleマップで<br>お店は見つかっていますか？</h2>
+          <p class="sub">
+            GoogleマップのURLを貼るだけ。<br>
+            <strong>GBP（Googleビジネスプロフィール）</strong>の最適化状況を<br>AIが6つの視点で診断＆改善案を提示。
+          </p>
+          <form id="gbpForm" class="form-wrap">
+            <input type="text" id="gbpUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url">
+            <button type="submit" id="gbpSubmitBtn" class="submit-btn gbp-btn">診断する →</button>
+          </form>
+          <p class="url-hint">対応URL: <code>google.com/maps/place/...</code> <code>maps.google.com</code> <code>g.page</code></p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ローディング -->
   <section id="loadingSection" class="loading-section">
     <dotlottie-player
       src="https://assets-v2.lottiefiles.com/a/4c212e56-1167-11ee-8aae-67cedcdfd57a/104k3Bi4a1.lottie"
-      background="transparent"
-      speed="1"
-      loop autoplay
+      background="transparent" speed="1" loop autoplay
       style="width: 120px; height: 120px; margin-bottom: 24px;"
     ></dotlottie-player>
-    <p id="loadingStep" class="loading-step">AIが分析中... (1/6)</p>
-    <p id="loadingStepDetail" class="loading-sub">robots.txtを確認中...</p>
+    <p id="loadingStep" class="loading-step">AIが分析中...</p>
+    <p id="loadingStepDetail" class="loading-sub"></p>
   </section>
 
   <!-- エラー -->
@@ -621,37 +762,48 @@
 
   <!-- 結果 -->
   <section id="resultSection" class="result-section">
-
-    <!-- 完了ヘッダー -->
+    <!-- 結果ヘッダー -->
     <div class="result-header fade-up">
-      <dotlottie-player
-        id="successLottie"
+      <dotlottie-player id="successLottie"
         src="https://assets-v2.lottiefiles.com/a/9a7b99d6-1173-11ee-b889-cf912d791ac4/6QFhZg0Ewk.lottie"
-        background="transparent"
-        speed="1"
+        background="transparent" speed="1"
         style="width: 44px; height: 44px; flex-shrink: 0;"
       ></dotlottie-player>
       <div>
         <p id="resultUrl" class="site-url"></p>
         <p id="resultDate" class="date"></p>
       </div>
+      <span id="resultTypeBadge" class="result-type-badge"></span>
     </div>
 
-    <!-- 総合スコア -->
+    <!-- GBPニュース（GBP診断時のみ表示） -->
+    <div id="gbpNewsCard" class="gbp-news-card" style="display:none;">
+      <div class="news-title">🗺️ GBP最新動向</div>
+      <p id="gbpNewsText"></p>
+    </div>
+
+    <!-- 総合スコア（円形ゲージ） -->
     <div class="score-card fade-up" style="animation-delay: 0.1s;">
       <p class="label">総合スコア</p>
-      <div>
-        <span id="scoreNumber" class="score-big">0</span>
-        <span class="score-max">/ 100</span>
+      <div class="score-gauge">
+        <svg viewBox="0 0 140 140">
+          <circle class="gauge-bg" cx="70" cy="70" r="65"></circle>
+          <circle id="gaugeFill" class="gauge-fill" cx="70" cy="70" r="65"></circle>
+        </svg>
+        <div class="gauge-text">
+          <span id="scoreNumber" class="score-big">0</span>
+          <span class="score-max">/ 100</span>
+        </div>
       </div>
       <span id="gradeLabel" class="grade-badge"></span>
+      <p id="summaryText" class="summary-text"></p>
     </div>
 
     <div class="sep"></div>
 
-    <!-- 5つの評価指標 -->
+    <!-- 評価指標 -->
     <div class="fade-up" style="animation-delay: 0.2s;">
-      <p class="section-title">5つの評価指標</p>
+      <p id="metricsTitle" class="section-title">評価指標</p>
       <div id="metricsGrid" class="metrics-grid"></div>
     </div>
 
@@ -665,7 +817,7 @@
 
     <div class="sep"></div>
 
-    <!-- 今すぐやること TOP3 -->
+    <!-- 今すぐやること -->
     <div class="fade-up" style="animation-delay: 0.4s;">
       <p class="section-title">今すぐやること TOP3</p>
       <div id="topActions"></div>
@@ -684,43 +836,53 @@
       <button onclick="copyReport()" id="copyBtn" class="btn-copy">レポートをコピー</button>
       <button onclick="backToForm()" class="btn-retry">もう一度診断する</button>
     </div>
-
   </section>
 
-<script>
-const CATEGORY_ICONS = {
-  ai_crawler_access: '&#x1F50D;',
-  llms_txt: '&#x1F4C4;',
-  structured_data: '&#x1F3D7;&#xFE0F;',
-  content_citability: '&#x1F4DD;',
-  meta_optimization: '&#x2699;&#xFE0F;'
-};
+  <footer class="site-footer">
+    AI検索GBP改善君 — Googleマップ × AI検索 最適化診断ツール
+  </footer>
 
-const CATEGORY_NAMES = {
-  ai_crawler_access: 'AIクローラーアクセス',
-  llms_txt: 'llms.txt設定',
-  structured_data: '構造化データ',
-  content_citability: 'コンテンツ品質',
+<script>
+// ===== Web診断用定義 =====
+const WEB_CATEGORY_ICONS = {
+  ai_crawler_access: '🔍', llms_txt: '📄', structured_data: '🏗️',
+  content_citability: '📝', meta_optimization: '⚙️'
+};
+const WEB_CATEGORY_NAMES = {
+  ai_crawler_access: 'AIクローラーアクセス', llms_txt: 'llms.txt設定',
+  structured_data: '構造化データ', content_citability: 'コンテンツ品質',
   meta_optimization: 'メタ情報最適化'
 };
+const WEB_CATEGORY_ORDER = ['ai_crawler_access', 'llms_txt', 'structured_data', 'content_citability', 'meta_optimization'];
 
-const CATEGORY_ORDER = ['ai_crawler_access', 'llms_txt', 'structured_data', 'content_citability', 'meta_optimization'];
+// ===== GBP診断用定義 =====
+const GBP_CATEGORY_ICONS = {
+  profile_completeness: '📋', photos_videos: '📸', reviews_management: '⭐',
+  posts_activity: '📢', qa_section: '❓', local_seo: '🎯'
+};
+const GBP_CATEGORY_NAMES = {
+  profile_completeness: 'プロフィール完成度', photos_videos: '写真・動画',
+  reviews_management: 'クチコミ管理', posts_activity: '投稿活動',
+  qa_section: 'Q&A管理', local_seo: 'ローカルSEO'
+};
+const GBP_CATEGORY_ORDER = ['profile_completeness', 'photos_videos', 'reviews_management', 'posts_activity', 'qa_section', 'local_seo'];
 
 let lastResult = null;
+let currentMode = 'web'; // 'web' or 'gbp'
 
-// スコアに応じた色
+// ===== タブ切り替え =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+  document.getElementById(tab === 'web' ? 'tabWeb' : 'tabGbp').classList.add('active');
+}
+
+// ===== スコアカラー =====
 function scoreColor(score) {
   if (score >= 80) return 'var(--good)';
   if (score >= 50) return 'var(--warn)';
   return 'var(--bad)';
-}
-
-// スコアに応じたバッジ
-function scoreBadge(score) {
-  if (score >= 80) return { cls: 'badge-good', text: '優秀' };
-  if (score >= 60) return { cls: 'badge-good', text: '良好' };
-  if (score >= 40) return { cls: 'badge-warn', text: '普通' };
-  return { cls: 'badge-bad', text: '要改善' };
 }
 
 function statusToBadge(status) {
@@ -730,12 +892,11 @@ function statusToBadge(status) {
 }
 
 function priorityInfo(p) {
-  if (p === 'high') return { cls: 'p-high', icon: '&#x1F534;', text: '高' };
-  if (p === 'medium') return { cls: 'p-medium', icon: '&#x1F7E1;', text: '中' };
-  return { cls: 'p-low', icon: '&#x1F7E2;', text: '低' };
+  if (p === 'high') return { cls: 'p-high', icon: '🔴', text: '高' };
+  if (p === 'medium') return { cls: 'p-medium', icon: '🟡', text: '中' };
+  return { cls: 'p-low', icon: '🟢', text: '低' };
 }
 
-// URL自動補完
 function normalizeUrl(input) {
   let url = input.trim();
   if (!url) return '';
@@ -743,34 +904,44 @@ function normalizeUrl(input) {
   return url;
 }
 
-// フォーム送信
-document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+// ===== Web診断フォーム =====
+document.getElementById('webForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const rawUrl = document.getElementById('urlInput').value;
-  const url = normalizeUrl(rawUrl);
+  const url = normalizeUrl(document.getElementById('webUrlInput').value);
   if (!url) return;
-  document.getElementById('urlInput').value = url;
-  await analyze(url);
+  document.getElementById('webUrlInput').value = url;
+  currentMode = 'web';
+  await runAnalysis(url, '/api/analyze', 'web');
 });
 
-// エンターキー対応（inputでもsubmitと同様に動作）
-document.getElementById('urlInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    document.getElementById('analyzeForm').requestSubmit();
-  }
+// ===== GBP診断フォーム =====
+document.getElementById('gbpForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = normalizeUrl(document.getElementById('gbpUrlInput').value);
+  if (!url) return;
+  document.getElementById('gbpUrlInput').value = url;
+  currentMode = 'gbp';
+  await runAnalysis(url, '/api/analyze-gbp', 'gbp');
 });
 
-async function analyze(url) {
-  showLoading();
+// ===== 分析実行 =====
+async function runAnalysis(url, endpoint, mode) {
+  showLoading(mode);
 
-  const steps = [
+  const steps = mode === 'web' ? [
     { main: 'AIが分析中... (1/6)', detail: 'robots.txtを確認中...' },
     { main: 'AIが分析中... (2/6)', detail: 'llms.txtを解析中...' },
     { main: 'AIが分析中... (3/6)', detail: '構造化データを抽出中...' },
     { main: 'AIが分析中... (4/6)', detail: 'コンテンツ品質を評価中...' },
     { main: 'AIが分析中... (5/6)', detail: 'メタ情報を解析中...' },
     { main: 'AIが分析中... (6/6)', detail: 'レポートを生成中...' }
+  ] : [
+    { main: 'AIが分析中... (1/6)', detail: 'GoogleマップURLを解析中...' },
+    { main: 'AIが分析中... (2/6)', detail: 'ビジネス情報を取得中...' },
+    { main: 'AIが分析中... (3/6)', detail: 'プロフィール完成度を確認中...' },
+    { main: 'AIが分析中... (4/6)', detail: 'クチコミ・写真を分析中...' },
+    { main: 'AIが分析中... (5/6)', detail: 'ローカルSEOを評価中...' },
+    { main: 'AIが分析中... (6/6)', detail: '改善レポートを生成中...' }
   ];
 
   let stepIndex = 0;
@@ -791,7 +962,7 @@ async function analyze(url) {
   }, 1500);
 
   try {
-    const response = await fetch('/api/analyze', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
@@ -801,7 +972,8 @@ async function analyze(url) {
       showError(data.error);
     } else {
       lastResult = data;
-      showResults(data);
+      lastResult._mode = mode;
+      showResults(data, mode);
     }
   } catch (err) {
     showError('通信エラーが発生しました。もう一度お試しください。');
@@ -810,90 +982,122 @@ async function analyze(url) {
   }
 }
 
-function showLoading() {
-  document.getElementById('heroSection').classList.add('hidden');
+function showLoading(mode) {
+  document.getElementById('mainSection').classList.add('hidden');
   document.getElementById('resultSection').classList.remove('active');
   document.getElementById('resultSection').style.display = 'none';
   document.getElementById('errorSection').classList.remove('active');
   document.getElementById('loadingSection').classList.add('active');
-  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('webSubmitBtn').disabled = true;
+  document.getElementById('gbpSubmitBtn').disabled = true;
 }
 
 function showError(msg) {
   document.getElementById('loadingSection').classList.remove('active');
   document.getElementById('errorText').textContent = msg;
   document.getElementById('errorSection').classList.add('active');
-  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('webSubmitBtn').disabled = false;
+  document.getElementById('gbpSubmitBtn').disabled = false;
 }
 
-function showResults(data) {
+function showResults(data, mode) {
   document.getElementById('loadingSection').classList.remove('active');
   const resultEl = document.getElementById('resultSection');
   resultEl.style.display = 'block';
   resultEl.classList.add('active');
-  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('webSubmitBtn').disabled = false;
+  document.getElementById('gbpSubmitBtn').disabled = false;
 
   // 成功Lottie再生
-  const successPlayer = document.getElementById('successLottie');
-  successPlayer.setAttribute('autoplay', '');
+  document.getElementById('successLottie').setAttribute('autoplay', '');
+
+  // 診断タイプバッジ
+  const typeBadge = document.getElementById('resultTypeBadge');
+  if (mode === 'gbp') {
+    typeBadge.className = 'result-type-badge badge-gbp';
+    typeBadge.textContent = '📍 GBP診断';
+  } else {
+    typeBadge.className = 'result-type-badge badge-web';
+    typeBadge.textContent = '🌐 Web診断';
+  }
 
   // サイト情報
-  document.getElementById('resultUrl').textContent = data.analyzed_url || '';
+  const displayName = mode === 'gbp' && data.business_name
+    ? data.business_name
+    : (data.analyzed_url || '');
+  document.getElementById('resultUrl').textContent = displayName;
   document.getElementById('resultDate').textContent = '分析日時: ' + new Date().toLocaleString('ja-JP');
 
-  // スコアカウントアップ
-  const scoreEl = document.getElementById('scoreNumber');
+  // GBPニュース
+  const newsCard = document.getElementById('gbpNewsCard');
+  if (mode === 'gbp' && data.gbp_news) {
+    newsCard.style.display = 'block';
+    document.getElementById('gbpNewsText').textContent = data.gbp_news;
+  } else {
+    newsCard.style.display = 'none';
+  }
+
+  // サマリー
+  document.getElementById('summaryText').textContent = data.summary || '';
+
+  // スコア（円形ゲージ）
   const target = data.overall_score;
   const color = scoreColor(target);
+  const scoreEl = document.getElementById('scoreNumber');
   animateCount(scoreEl, target, color);
+
+  // ゲージアニメーション
+  const gaugeFill = document.getElementById('gaugeFill');
+  gaugeFill.style.stroke = color;
+  const circumference = 2 * Math.PI * 65; // r=65
+  const offset = circumference - (circumference * target / 100);
+  setTimeout(() => { gaugeFill.style.strokeDashoffset = offset; }, 100);
 
   // グレード
   const gradeEl = document.getElementById('gradeLabel');
   gradeEl.textContent = data.grade;
   if (target >= 80) {
-    gradeEl.style.background = 'var(--good-bg)';
-    gradeEl.style.color = 'var(--good)';
+    gradeEl.style.background = 'var(--good-bg)'; gradeEl.style.color = 'var(--good)';
   } else if (target >= 50) {
-    gradeEl.style.background = 'var(--warn-bg)';
-    gradeEl.style.color = 'var(--warn)';
+    gradeEl.style.background = 'var(--warn-bg)'; gradeEl.style.color = 'var(--warn)';
   } else {
-    gradeEl.style.background = 'var(--bad-bg)';
-    gradeEl.style.color = 'var(--bad)';
+    gradeEl.style.background = 'var(--bad-bg)'; gradeEl.style.color = 'var(--bad)';
   }
 
-  // カテゴリキー順
-  const catKeys = CATEGORY_ORDER.filter(k => data.categories[k]);
+  // カテゴリ設定
+  const catIcons = mode === 'gbp' ? GBP_CATEGORY_ICONS : WEB_CATEGORY_ICONS;
+  const catNames = mode === 'gbp' ? GBP_CATEGORY_NAMES : WEB_CATEGORY_NAMES;
+  const catOrder = mode === 'gbp' ? GBP_CATEGORY_ORDER : WEB_CATEGORY_ORDER;
+
+  const catKeys = catOrder.filter(k => data.categories[k]);
   Object.keys(data.categories).forEach(k => {
     if (!catKeys.includes(k)) catKeys.push(k);
   });
 
-  // 5つの評価指標
+  // セクションタイトル
+  document.getElementById('metricsTitle').textContent =
+    mode === 'gbp' ? '6つの評価指標' : '5つの評価指標';
+
+  // 指標バー
   const metricsEl = document.getElementById('metricsGrid');
   metricsEl.innerHTML = '';
   catKeys.forEach((key, i) => {
     const cat = data.categories[key];
     const barColor = scoreColor(cat.score);
     const badge = statusToBadge(cat.status);
-    const icon = CATEGORY_ICONS[key] || '&#x1F4CA;';
-    const name = CATEGORY_NAMES[key] || cat.title;
-
+    const icon = catIcons[key] || '📊';
+    const name = catNames[key] || cat.title;
     const row = document.createElement('div');
     row.className = 'metric-row';
     row.innerHTML = `
       <span class="metric-icon">${icon}</span>
       <span class="metric-name">${name}</span>
-      <div class="metric-bar-wrap">
-        <div class="metric-bar-fill" style="background: ${barColor};"></div>
-      </div>
-      <span class="metric-score" style="color: ${barColor};">${cat.score}</span>
+      <div class="metric-bar-wrap"><div class="metric-bar-fill" style="background:${barColor};"></div></div>
+      <span class="metric-score" style="color:${barColor};">${cat.score}</span>
       <span class="metric-badge ${badge.cls}">${badge.text}</span>
     `;
     metricsEl.appendChild(row);
-
-    // バーアニメーション
-    setTimeout(() => {
-      row.querySelector('.metric-bar-fill').style.width = cat.score + '%';
-    }, 300 + i * 120);
+    setTimeout(() => { row.querySelector('.metric-bar-fill').style.width = cat.score + '%'; }, 300 + i * 120);
   });
 
   // 詳細カード
@@ -902,39 +1106,28 @@ function showResults(data) {
   catKeys.forEach((key, i) => {
     const cat = data.categories[key];
     const barColor = scoreColor(cat.score);
-    const icon = CATEGORY_ICONS[key] || '&#x1F4CA;';
+    const icon = catIcons[key] || '📊';
     const badge = statusToBadge(cat.status);
-
     let recsHtml = '';
     if (cat.recommendations && cat.recommendations.length > 0) {
-      recsHtml = '<ul class="recs">' + cat.recommendations.map(r =>
-        `<li>${r}</li>`
-      ).join('') + '</ul>';
+      recsHtml = '<ul class="recs">' + cat.recommendations.map(r => `<li>${r}</li>`).join('') + '</ul>';
     }
-
     const card = document.createElement('div');
     card.className = 'detail-card';
     card.innerHTML = `
       <div class="card-head">
         <div class="card-title">
-          <span>${icon}</span>
-          <span>${cat.title}</span>
+          <span>${icon}</span><span>${cat.title}</span>
           <span class="metric-badge ${badge.cls}">${badge.text}</span>
         </div>
-        <span class="card-score" style="color: ${barColor};">${cat.score}<span style="font-size:13px;color:var(--text-sub);font-weight:500;"> / 100</span></span>
+        <span class="card-score" style="color:${barColor};">${cat.score}<span style="font-size:12px;color:var(--text-sub);font-weight:500;"> / 100</span></span>
       </div>
-      <div class="card-bar-wrap">
-        <div class="card-bar-fill" style="background: ${barColor};"></div>
-      </div>
+      <div class="card-bar-wrap"><div class="card-bar-fill" style="background:${barColor};"></div></div>
       <p class="card-detail">${cat.detail}</p>
       ${recsHtml}
     `;
     cardsEl.appendChild(card);
-
-    // バーアニメーション
-    setTimeout(() => {
-      card.querySelector('.card-bar-fill').style.width = cat.score + '%';
-    }, 600 + i * 150);
+    setTimeout(() => { card.querySelector('.card-bar-fill').style.width = cat.score + '%'; }, 600 + i * 150);
   });
 
   // アクションアイテム
@@ -961,54 +1154,74 @@ function showResults(data) {
     guideContent.innerHTML = '';
     const pg = data.practical_guide;
 
-    // llms.txtサンプル
+    // Web診断: llms.txtサンプル
     if (pg.llms_txt_sample) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `
-        <div class="guide-block">
-          <p class="guide-block-title">📁 llms.txt サンプル（コピーして使える）</p>
-          <div style="position:relative;">
-            <pre id="llmsTxtCode">${escapeHtml(pg.llms_txt_sample)}</pre>
-            <button class="copy-code-btn" onclick="copyCode('llmsTxtCode', this)">コピー</button>
-          </div>
+      block.innerHTML = `<div class="guide-block">
+        <p class="guide-block-title">📁 llms.txt サンプル（コピーして使える）</p>
+        <div style="position:relative;">
+          <pre id="llmsTxtCode">${escapeHtml(pg.llms_txt_sample)}</pre>
+          <button class="copy-code-btn" onclick="copyCode('llmsTxtCode', this)">コピー</button>
         </div>
-      `;
+      </div>`;
       guideContent.appendChild(block);
     }
 
-    // JSON-LDサンプル
+    // Web診断: JSON-LDサンプル
     if (pg.schema_suggestion) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `
-        <div class="guide-block">
-          <p class="guide-block-title">🏗️ 構造化データ サンプル（JSON-LD）</p>
-          <div style="position:relative;">
-            <pre id="schemaCode">${escapeHtml(pg.schema_suggestion)}</pre>
-            <button class="copy-code-btn" onclick="copyCode('schemaCode', this)">コピー</button>
-          </div>
+      block.innerHTML = `<div class="guide-block">
+        <p class="guide-block-title">🏗️ 構造化データ サンプル（JSON-LD）</p>
+        <div style="position:relative;">
+          <pre id="schemaCode">${escapeHtml(pg.schema_suggestion)}</pre>
+          <button class="copy-code-btn" onclick="copyCode('schemaCode', this)">コピー</button>
         </div>
-      `;
+      </div>`;
       guideContent.appendChild(block);
     }
 
-    // FAQ案
+    // Web診断: FAQ案
     if (pg.faq_ideas && pg.faq_ideas.length > 0) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `
-        <div class="guide-block">
-          <p class="guide-block-title">❓ AI引用されやすいFAQ案</p>
-          <ul class="faq-list">
-            ${pg.faq_ideas.map(f => `<li>${escapeHtml(f)}</li>`).join('')}
-          </ul>
-        </div>
-      `;
+      block.innerHTML = `<div class="guide-block">
+        <p class="guide-block-title">❓ AI引用されやすいFAQ案</p>
+        <ul class="faq-list">${pg.faq_ideas.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
+      </div>`;
       guideContent.appendChild(block);
     }
 
-    // クイックウィン
+    // GBP診断: 投稿サンプル
+    if (pg.gbp_post_sample) {
+      const block = document.createElement('div');
+      block.className = 'practical-guide';
+      block.innerHTML = `<div class="guide-block">
+        <p class="guide-block-title">📢 GBP投稿サンプル（今すぐ使える）</p>
+        <div class="guide-text-block" style="position:relative;">
+          <span id="gbpPostText">${escapeHtml(pg.gbp_post_sample)}</span>
+          <button class="copy-code-btn" style="top:8px;right:8px;background:rgba(0,0,0,0.08);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('gbpPostText', this)">コピー</button>
+        </div>
+      </div>`;
+      guideContent.appendChild(block);
+    }
+
+    // GBP診断: クチコミ返信テンプレート
+    if (pg.response_template) {
+      const block = document.createElement('div');
+      block.className = 'practical-guide';
+      block.innerHTML = `<div class="guide-block">
+        <p class="guide-block-title">💬 クチコミ返信テンプレート</p>
+        <div class="guide-text-block" style="position:relative;">
+          <span id="responseTemplateText">${escapeHtml(pg.response_template)}</span>
+          <button class="copy-code-btn" style="top:8px;right:8px;background:rgba(0,0,0,0.08);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('responseTemplateText', this)">コピー</button>
+        </div>
+      </div>`;
+      guideContent.appendChild(block);
+    }
+
+    // クイックウィン（共通）
     if (pg.quick_wins && pg.quick_wins.length > 0) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
@@ -1016,15 +1229,13 @@ function showResults(data) {
       pg.quick_wins.forEach(qw => {
         const impactCls = qw.impact === 'high' ? 'p-high' : qw.impact === 'medium' ? 'p-medium' : 'p-low';
         const impactText = qw.impact === 'high' ? '高' : qw.impact === 'medium' ? '中' : '低';
-        html += `
-          <div class="quick-win-item">
-            <div class="qw-header">
-              <span class="qw-title">${escapeHtml(qw.title)}</span>
-              <span class="qw-impact ${impactCls}">効果: ${impactText}</span>
-            </div>
-            <ol>${qw.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+        html += `<div class="quick-win-item">
+          <div class="qw-header">
+            <span class="qw-title">${escapeHtml(qw.title)}</span>
+            <span class="qw-impact ${impactCls}">効果: ${impactText}</span>
           </div>
-        `;
+          <ol>${qw.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+        </div>`;
       });
       block.innerHTML = html;
       guideContent.appendChild(block);
@@ -1042,11 +1253,9 @@ function animateCount(el, target, color) {
   let current = 0;
   const duration = 800;
   const start = performance.now();
-
   function tick(now) {
     const elapsed = now - start;
     const progress = Math.min(elapsed / duration, 1);
-    // easeOutQuart
     const eased = 1 - Math.pow(1 - progress, 4);
     current = Math.round(eased * target);
     el.textContent = current;
@@ -1062,7 +1271,8 @@ function escapeHtml(str) {
 }
 
 function copyCode(elId, btn) {
-  const code = document.getElementById(elId).textContent;
+  const el = document.getElementById(elId);
+  const code = el.textContent;
   navigator.clipboard.writeText(code).then(() => {
     btn.textContent = 'コピー済';
     setTimeout(() => { btn.textContent = 'コピー'; }, 2000);
@@ -1073,14 +1283,26 @@ function backToForm() {
   document.getElementById('resultSection').style.display = 'none';
   document.getElementById('resultSection').classList.remove('active');
   document.getElementById('errorSection').classList.remove('active');
-  document.getElementById('heroSection').classList.remove('hidden');
-  document.getElementById('urlInput').focus();
+  document.getElementById('mainSection').classList.remove('hidden');
+  // ゲージリセット
+  document.getElementById('gaugeFill').style.strokeDashoffset = 408;
+  if (currentMode === 'gbp') {
+    document.getElementById('gbpUrlInput').focus();
+  } else {
+    document.getElementById('webUrlInput').focus();
+  }
 }
 
 function copyReport() {
   if (!lastResult) return;
   const d = lastResult;
-  let text = `【GEOチェッカー 診断レポート】\n`;
+  const mode = d._mode || 'web';
+  let text = mode === 'gbp'
+    ? `【AI検索GBP改善君 GBP診断レポート】\n`
+    : `【AI検索GBP改善君 Webサイト診断レポート】\n`;
+  if (mode === 'gbp' && d.business_name) {
+    text += `ビジネス名: ${d.business_name}\n`;
+  }
   text += `URL: ${d.analyzed_url}\n`;
   text += `総合スコア: ${d.overall_score}/100 (${d.grade})\n\n`;
   text += `${d.summary}\n\n`;
@@ -1104,10 +1326,7 @@ function copyReport() {
     const btn = document.getElementById('copyBtn');
     btn.textContent = 'コピーしました';
     btn.style.background = 'var(--good)';
-    setTimeout(() => {
-      btn.textContent = 'レポートをコピー';
-      btn.style.background = '';
-    }, 2000);
+    setTimeout(() => { btn.textContent = 'レポートをコピー'; btn.style.background = ''; }, 2000);
   });
 }
 </script>
