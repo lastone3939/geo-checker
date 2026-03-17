@@ -10,28 +10,28 @@
   <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
   <style>
     :root {
-      --bg: #0A0F1E;
-      --bg2: #111827;
-      --surface: #1A2236;
-      --border: #2A3450;
-      --text: #F9FAFB;
-      --text-sub: #9CA3AF;
-      --muted: #6B7280;
-      --accent: #00C896;
-      --accent-light: rgba(0,200,150,0.12);
-      --accent-glow: rgba(0,200,150,0.3);
-      --primary: #00C896;
-      --primary-light: rgba(0,200,150,0.12);
-      --secondary: #00C896;
-      --secondary-light: rgba(0,200,150,0.12);
-      --warn: #F59E0B;
-      --warn-bg: rgba(245,158,11,0.15);
-      --bad: #EF4444;
-      --bad-bg: rgba(239,68,68,0.15);
+      --bg: #F9FAFB;
+      --surface: #FFFFFF;
+      --border: #E8EAED;
+      --text: #202124;
+      --text-sub: #5F6368;
+      --muted: #9AA0A6;
+      --primary: #1A73E8;
+      --primary-light: #E8F0FE;
+      --secondary: #34A853;
+      --secondary-light: #E6F4EA;
+      --accent: #FBBC04;
+      --accent-light: #FEF7E0;
+      --danger: #EA4335;
+      --danger-light: #FCE8E6;
       --good: #00C896;
-      --good-bg: rgba(0,200,150,0.15);
-      --shadow: 0 2px 8px rgba(0,0,0,0.3);
-      --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+      --good-bg: rgba(0,200,150,0.12);
+      --warn: #F59E0B;
+      --warn-bg: rgba(245,158,11,0.12);
+      --bad: #EA4335;
+      --bad-bg: rgba(234,67,53,0.12);
+      --shadow: 0 1px 3px rgba(60,64,67,0.15), 0 1px 2px rgba(60,64,67,0.10);
+      --shadow-md: 0 4px 8px rgba(60,64,67,0.15), 0 2px 4px rgba(60,64,67,0.10);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -43,13 +43,13 @@
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
-    a { color: var(--accent); text-decoration: none; }
+    a { color: var(--primary); text-decoration: none; }
 
-    /* ===== ヘッダー ===== */
+    /* ヘッダー */
     .site-header {
       padding: 14px 24px;
       border-bottom: 1px solid var(--border);
-      background: var(--bg2);
+      background: var(--surface);
       display: flex;
       align-items: center;
       gap: 12px;
@@ -58,32 +58,31 @@
       font-size: 22px; font-weight: 800; color: var(--text);
       display: flex; align-items: center; gap: 8px;
     }
-    .site-header .logo .accent { color: var(--accent); }
+    .site-header .logo .blue { color: var(--primary); }
     .site-header .subtitle { font-size: 12px; color: var(--text-sub); font-weight: 500; }
 
-    /* ===== ヒーローセクション ===== */
+    /* ヒーローセクション */
     .hero {
       text-align: center;
-      padding: 60px 24px 40px;
-      background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+      padding: 56px 24px 40px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
       position: relative;
-      overflow: hidden;
     }
-    .hero::before {
-      content: '';
-      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-      background: radial-gradient(ellipse at 50% 0%, rgba(0,200,150,0.08) 0%, transparent 60%);
-      pointer-events: none;
+    .hero-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 16px;
     }
     .hero h1 {
-      font-size: clamp(28px, 5vw, 44px);
+      font-size: clamp(26px, 5vw, 40px);
       font-weight: 900;
       letter-spacing: -0.02em;
       line-height: 1.3;
-      margin-bottom: 16px;
-      position: relative;
     }
-    .hero h1 .accent { color: var(--accent); }
+    .hero h1 .blue { color: var(--primary); }
     .hero .hero-sub {
       font-size: clamp(14px, 2.5vw, 17px);
       color: var(--text-sub);
@@ -93,22 +92,29 @@
     }
     .hero-badge {
       display: inline-block;
-      background: var(--accent-light);
-      color: var(--accent);
+      background: var(--primary-light);
+      color: var(--primary);
       font-size: 13px;
       font-weight: 700;
       padding: 6px 18px;
       border-radius: 20px;
       margin-bottom: 32px;
-      border: 1px solid rgba(0,200,150,0.25);
+      border: 1px solid rgba(26,115,232,0.2);
+    }
+    .cat-mascot {
+      flex-shrink: 0;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
     }
 
-    /* ===== タブUI ===== */
+    /* タブUI */
     .tab-container {
       max-width: 640px;
       margin: 0 auto;
       padding: 0 24px;
-      position: relative;
     }
     .tabs {
       display: flex; gap: 0;
@@ -122,15 +128,15 @@
       margin-bottom: -2px;
       font-size: 15px; font-weight: 600;
       font-family: "Noto Sans JP", sans-serif;
-      color: var(--muted); cursor: pointer;
+      color: var(--text-sub); cursor: pointer;
       transition: all 0.2s; text-align: center;
     }
-    .tab-btn:hover { color: var(--text); background: rgba(0,200,150,0.05); }
-    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn:hover { color: var(--text); background: rgba(26,115,232,0.06); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
     .tab-content { display: none; padding: 0 0 32px; }
     .tab-content.active { display: block; }
 
-    /* ===== 入力フォーム ===== */
+    /* 入力フォーム */
     .form-wrap {
       display: flex; gap: 8px;
       max-width: 540px; width: 100%; margin: 0 auto;
@@ -147,30 +153,31 @@
     }
     .url-input:focus {
       outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(26,115,232,0.15);
     }
     .url-input::placeholder { color: var(--muted); }
     .submit-btn {
       padding: 14px 28px;
-      background: var(--accent);
-      color: #0A0F1E;
+      background: var(--primary);
+      color: #fff;
       border: none; border-radius: 10px;
       font-size: 15px; font-weight: 700;
       font-family: "Noto Sans JP", sans-serif;
       cursor: pointer; white-space: nowrap;
       transition: all 0.2s;
     }
-    .submit-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px var(--accent-glow); }
+    .submit-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,115,232,0.3); }
     .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-    .submit-btn.gbp-btn { background: var(--accent); }
+    .submit-btn.gbp-btn { background: var(--secondary); }
+    .submit-btn.gbp-btn:hover { box-shadow: 0 4px 12px rgba(52,168,83,0.3); }
 
     .url-hint {
       margin-top: 12px; font-size: 12px;
       color: var(--muted); text-align: center;
     }
     .url-hint code {
-      background: var(--surface); padding: 2px 6px;
+      background: #F1F3F4; padding: 2px 6px;
       border-radius: 3px; font-size: 11px; color: var(--text-sub);
     }
 
@@ -179,7 +186,7 @@
       .submit-btn { width: 100%; }
     }
 
-    /* ===== LPセクション共通 ===== */
+    /* LPセクション共通 */
     .lp-section {
       max-width: 900px;
       margin: 0 auto;
@@ -190,31 +197,32 @@
       font-weight: 800;
       text-align: center;
       margin-bottom: 12px;
+      color: var(--text);
     }
     .lp-section-sub {
       font-size: 14px; color: var(--text-sub);
       text-align: center; margin-bottom: 40px;
     }
 
-    /* ===== サンプルレポートカード ===== */
+    /* サンプルレポートカード */
     .sample-report {
-      background: var(--bg2);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 32px;
       position: relative;
       max-width: 600px;
       margin: 0 auto;
+      box-shadow: var(--shadow);
     }
     .sample-badge {
       position: absolute; top: -14px; right: 20px;
-      background: var(--accent); color: #0A0F1E;
+      background: var(--primary);
+      color: #fff;
       font-size: 11px; font-weight: 700;
       padding: 4px 14px; border-radius: 12px;
     }
-    .sample-biz-name {
-      font-size: 18px; font-weight: 700; margin-bottom: 4px;
-    }
+    .sample-biz-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
     .sample-score-row {
       display: flex; align-items: center; gap: 16px;
       margin: 16px 0 24px;
@@ -235,8 +243,6 @@
       padding: 4px 16px; border-radius: 8px;
     }
     .sample-summary { font-size: 13px; color: var(--text-sub); }
-
-    /* プログレスバー（サンプル） */
     .s-bar-row {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 10px; font-size: 13px;
@@ -244,23 +250,21 @@
     .s-bar-label { width: 130px; flex-shrink: 0; font-weight: 600; color: var(--text-sub); }
     .s-bar-wrap {
       flex: 1; height: 8px;
-      background: rgba(255,255,255,0.08);
+      background: #F1F3F4;
       border-radius: 4px; overflow: hidden;
     }
-    .s-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+    .s-bar-fill { height: 100%; border-radius: 4px; }
     .s-bar-score { width: 40px; text-align: right; font-weight: 700; font-size: 13px; }
     .s-bar-emoji { width: 20px; text-align: center; font-size: 14px; }
-
-    /* サンプルアクション */
     .sample-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
     .sample-action {
       display: flex; align-items: flex-start; gap: 10px;
-      background: var(--surface); border: 1px solid var(--border);
+      background: var(--bg); border: 1px solid var(--border);
       border-radius: 8px; padding: 10px 14px; font-size: 13px;
     }
     .sample-action .emoji { flex-shrink: 0; }
 
-    /* ===== 90日プランサンプル ===== */
+    /* 90日プランサンプル */
     .plan-cards {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -270,20 +274,18 @@
     .plan-card-sample {
       border-radius: 14px;
       padding: 24px;
+      background: var(--surface);
       border: 1px solid var(--border);
+      box-shadow: var(--shadow);
     }
-    .plan-card-sample.green { background: linear-gradient(135deg, rgba(0,200,150,0.1), rgba(0,200,150,0.03)); border-color: rgba(0,200,150,0.3); }
-    .plan-card-sample.blue { background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.03)); border-color: rgba(59,130,246,0.3); }
-    .plan-card-sample.purple { background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(168,85,247,0.03)); border-color: rgba(168,85,247,0.3); }
-    .plan-card-sample h4 {
-      font-size: 15px; font-weight: 700; margin-bottom: 12px;
-    }
+    .plan-card-sample.green { border-left: 4px solid #00C896; }
+    .plan-card-sample.blue { border-left: 4px solid #1A73E8; }
+    .plan-card-sample.purple { border-left: 4px solid #A855F7; }
+    .plan-card-sample h4 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
     .plan-card-sample.green h4 { color: #00C896; }
-    .plan-card-sample.blue h4 { color: #3B82F6; }
+    .plan-card-sample.blue h4 { color: #1A73E8; }
     .plan-card-sample.purple h4 { color: #A855F7; }
-    .plan-card-sample ul {
-      list-style: none; padding: 0;
-    }
+    .plan-card-sample ul { list-style: none; padding: 0; }
     .plan-card-sample li {
       font-size: 13px; color: var(--text-sub);
       padding: 3px 0; display: flex; align-items: center; gap: 6px;
@@ -293,40 +295,22 @@
       border-radius: 50%; flex-shrink: 0;
     }
     .plan-card-sample.green li::before { background: #00C896; }
-    .plan-card-sample.blue li::before { background: #3B82F6; }
+    .plan-card-sample.blue li::before { background: #1A73E8; }
     .plan-card-sample.purple li::before { background: #A855F7; }
 
-    .quick-win-sample {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    .quick-win-sample h4 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
-    .qw-check {
-      display: flex; align-items: center; gap: 10px;
-      font-size: 13px; color: var(--text-sub); padding: 4px 0;
-    }
-    .qw-check .box {
-      width: 18px; height: 18px;
-      border: 2px solid var(--accent);
-      border-radius: 4px; flex-shrink: 0;
-    }
-
-    /* ===== AIチャットプレビュー ===== */
+    /* AIチャットプレビュー */
     .chat-preview {
       max-width: 480px;
       margin: 0 auto;
-      background: var(--bg2);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 16px;
       overflow: hidden;
+      box-shadow: var(--shadow);
     }
     .chat-preview-header {
-      background: var(--accent);
-      color: #0A0F1E;
+      background: var(--primary);
+      color: #fff;
       padding: 12px 16px;
       font-size: 14px; font-weight: 700;
     }
@@ -337,13 +321,13 @@
     }
     .chat-bubble.user {
       align-self: flex-end;
-      background: var(--accent);
-      color: #0A0F1E;
+      background: var(--primary);
+      color: #fff;
       border-bottom-right-radius: 4px;
     }
     .chat-bubble.ai {
       align-self: flex-start;
-      background: var(--surface);
+      background: #F1F3F4;
       color: var(--text);
       border-bottom-left-radius: 4px;
     }
@@ -352,26 +336,27 @@
       color: var(--muted); margin-top: 16px;
     }
 
-    /* ===== 特徴カード ===== */
+    /* 特徴カード */
     .feature-cards {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
       gap: 16px;
     }
     .feat-card {
-      background: var(--bg2);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 28px 24px;
       text-align: center;
+      box-shadow: var(--shadow);
       transition: border-color 0.3s;
     }
-    .feat-card:hover { border-color: var(--accent); }
+    .feat-card:hover { border-color: var(--primary); }
     .feat-card .feat-icon { font-size: 36px; margin-bottom: 12px; }
     .feat-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
     .feat-card p { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
 
-    /* ===== ローディング ===== */
+    /* ローディング */
     .loading-section {
       display: none; flex-direction: column; align-items: center;
       justify-content: center; min-height: 50vh;
@@ -388,15 +373,15 @@
     }
     .step-animate { animation: stepFade 1.2s ease-in-out forwards; }
 
-    /* ===== エラー ===== */
+    /* エラー */
     .error-section { display: none; max-width: 560px; margin: 80px auto; padding: 0 24px; }
     .error-section.active { display: block; }
     .error-card {
-      background: var(--bad-bg); border: 1px solid rgba(239,68,68,0.3);
+      background: var(--bad-bg); border: 1px solid #F5C6CB;
       border-radius: 10px; padding: 24px;
     }
     .error-card .title { font-weight: 700; color: var(--bad); margin-bottom: 8px; }
-    .error-card .msg { font-size: 14px; color: #FCA5A5; line-height: 1.7; }
+    .error-card .msg { font-size: 14px; color: #C5221F; line-height: 1.7; }
     .error-card .back-btn {
       margin-top: 16px; padding: 8px 16px;
       background: var(--surface); border: 1px solid var(--border);
@@ -405,13 +390,12 @@
       font-family: "Noto Sans JP", sans-serif;
     }
 
-    /* ===== 結果セクション ===== */
+    /* 結果セクション */
     .result-section {
       display: none; max-width: 720px;
       margin: 0 auto; padding: 48px 24px 80px;
     }
     .result-section.active { display: block; }
-
     .result-header {
       display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
     }
@@ -421,11 +405,12 @@
       font-size: 11px; font-weight: 700;
       padding: 3px 10px; border-radius: 4px; flex-shrink: 0;
     }
-    .badge-web { background: rgba(59,130,246,0.15); color: #60A5FA; }
-    .badge-gbp { background: var(--accent-light); color: var(--accent); }
+    .badge-web { background: var(--primary-light); color: var(--primary); }
+    .badge-gbp { background: var(--secondary-light); color: var(--secondary); }
 
     .gbp-news-card {
-      background: var(--surface); border: 1px solid var(--border);
+      background: linear-gradient(135deg, #E8F0FE 0%, #E6F4EA 100%);
+      border: 1px solid var(--border);
       border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;
       font-size: 13px; line-height: 1.7;
     }
@@ -433,22 +418,22 @@
 
     /* 総合スコアカード */
     .score-card {
-      background: var(--bg2); border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: 14px; padding: 36px; text-align: center;
       box-shadow: var(--shadow); margin-bottom: 28px;
     }
     .score-card .label { font-size: 13px; font-weight: 600; color: var(--text-sub); margin-bottom: 16px; }
     .score-gauge { position: relative; width: 160px; height: 160px; margin: 0 auto 16px; }
     .score-gauge svg { width: 160px; height: 160px; transform: rotate(-90deg); }
-    .score-gauge .gauge-bg { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 10; }
-    .score-gauge .gauge-fill { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1.2s ease-out; }
+    .score-gauge .gauge-bg { fill: none; stroke: #F1F3F4; stroke-width: 10; }
+    .score-gauge .gauge-fill { fill: none; stroke: var(--primary); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1.2s ease-out; }
     .score-gauge .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
-    .score-gauge .score-big { font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--accent); }
+    .score-gauge .score-big { font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--primary); }
     .score-gauge .score-max { font-size: 14px; font-weight: 500; color: var(--muted); display: block; margin-top: 4px; }
     .grade-badge {
       display: inline-block; padding: 4px 16px; border-radius: 6px;
       font-size: 14px; font-weight: 700;
-      background: var(--accent-light); color: var(--accent);
+      background: var(--primary-light); color: var(--primary);
     }
     .score-card .summary-text {
       margin-top: 16px; font-size: 14px; color: var(--text-sub);
@@ -462,8 +447,8 @@
     .metrics-grid { display: flex; flex-direction: column; gap: 14px; }
     .metric-row { display: flex; align-items: center; gap: 10px; }
     .metric-icon { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
-    .metric-name { font-size: 13px; font-weight: 600; color: var(--text-sub); width: 150px; flex-shrink: 0; }
-    .metric-bar-wrap { flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+    .metric-name { font-size: 13px; font-weight: 600; color: var(--text); width: 150px; flex-shrink: 0; }
+    .metric-bar-wrap { flex: 1; height: 8px; background: #F1F3F4; border-radius: 4px; overflow: hidden; }
     .metric-bar-fill { height: 100%; border-radius: 4px; width: 0%; transition: width 1s ease; }
     .metric-score { font-size: 14px; font-weight: 700; width: 32px; text-align: right; flex-shrink: 0; }
     .metric-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
@@ -473,24 +458,24 @@
 
     /* 詳細カード */
     .detail-card {
-      background: var(--bg2); border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: 10px; padding: 20px;
       box-shadow: var(--shadow); margin-bottom: 10px;
     }
     .detail-card .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
     .detail-card .card-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
     .detail-card .card-score { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
-    .detail-card .card-bar-wrap { height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+    .detail-card .card-bar-wrap { height: 5px; background: #F1F3F4; border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
     .detail-card .card-bar-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 1s ease; }
     .detail-card .card-detail { font-size: 13px; color: var(--text-sub); line-height: 1.8; margin-bottom: 10px; }
     .detail-card .recs { list-style: none; padding: 0; }
     .detail-card .recs li { font-size: 13px; color: var(--text-sub); padding: 3px 0; display: flex; align-items: flex-start; gap: 8px; }
-    .detail-card .recs li::before { content: "✓"; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+    .detail-card .recs li::before { content: "\2713"; color: var(--primary); font-weight: 700; flex-shrink: 0; }
 
     /* アクションアイテム */
     .action-item {
       display: flex; align-items: flex-start; gap: 12px;
-      padding: 12px 14px; background: var(--bg2);
+      padding: 12px 14px; background: var(--surface);
       border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px;
     }
     .action-priority { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px; flex-shrink: 0; white-space: nowrap; }
@@ -501,7 +486,7 @@
 
     /* 実践ガイド */
     .practical-guide {
-      background: var(--surface); border: 1px solid var(--border);
+      background: #F1F3F4; border: 1px solid var(--border);
       border-radius: 10px; padding: 20px; margin-bottom: 10px;
     }
     .practical-guide .guide-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
@@ -509,7 +494,7 @@
     .practical-guide .guide-block:last-child { margin-bottom: 0; }
     .practical-guide .guide-block-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
     .practical-guide pre {
-      background: #000; color: #E8EAED;
+      background: #202124; color: #E8EAED;
       padding: 16px; border-radius: 8px;
       font-family: "SF Mono", "Fira Code", monospace;
       font-size: 13px; line-height: 1.6;
@@ -526,9 +511,9 @@
     .copy-code-btn:hover { background: rgba(255,255,255,0.25); }
     .practical-guide .faq-list { list-style: none; padding: 0; }
     .practical-guide .faq-list li { font-size: 13px; color: var(--text); padding: 5px 0; line-height: 1.6; }
-    .practical-guide .faq-list li::before { content: "・"; color: var(--accent); font-weight: 700; }
+    .practical-guide .faq-list li::before { content: "\30FB"; color: var(--primary); font-weight: 700; }
     .quick-win-item {
-      background: var(--bg2); border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
     }
     .quick-win-item .qw-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -537,7 +522,7 @@
     .quick-win-item ol { padding-left: 20px; margin: 0; }
     .quick-win-item ol li { font-size: 12px; color: var(--text-sub); line-height: 1.7; }
     .guide-text-block {
-      background: var(--bg2); border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: 8px; padding: 14px 16px; font-size: 13px;
       line-height: 1.8; color: var(--text); white-space: pre-wrap; position: relative;
     }
@@ -549,28 +534,28 @@
       font-weight: 600; font-family: "Noto Sans JP", sans-serif;
       cursor: pointer; transition: all 0.2s;
     }
-    .btn-copy { background: var(--accent); color: #0A0F1E; border: none; }
+    .btn-copy { background: var(--primary); color: #fff; border: none; }
     .btn-copy:hover { opacity: 0.85; }
     .btn-retry { background: var(--surface); color: var(--text-sub); border: 1px solid var(--border); }
-    .btn-retry:hover { background: var(--bg2); }
+    .btn-retry:hover { background: #F1F3F4; }
 
     /* 動画セクション */
     .video-section { margin-top: 24px; }
-    .video-card { background: var(--bg2); border: 2px solid var(--accent); border-radius: 16px; padding: 24px; }
+    .video-card { background: var(--surface); border: 2px solid var(--primary); border-radius: 16px; padding: 24px; }
     .video-card-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
     .video-icon { font-size: 36px; flex-shrink: 0; }
-    .video-title { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .video-title { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
     .video-subtitle { font-size: 14px; color: var(--text-sub); }
-    .video-start-btn { width: 100%; padding: 16px; background: var(--accent); color: #0A0F1E; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .2s; font-family: "Noto Sans JP", sans-serif; }
+    .video-start-btn { width: 100%; padding: 16px; background: var(--primary); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .2s; font-family: "Noto Sans JP", sans-serif; }
     .video-start-btn:hover { opacity: 0.85; }
     .video-start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .progress-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 8px; height: 12px; margin: 16px 0 8px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #3B82F6); border-radius: 8px; transition: width .5s ease; }
+    .progress-bar-wrap { background: #F1F3F4; border-radius: 8px; height: 12px; margin: 16px 0 8px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #1A73E8, #34A853); border-radius: 8px; transition: width .5s ease; }
     .video-status-text { font-size: 13px; color: var(--text-sub); text-align: center; }
-    .video-done-msg { font-size: 16px; font-weight: 700; color: var(--accent); margin: 16px 0 12px; text-align: center; }
-    .video-download-btn { display: block; text-align: center; background: var(--accent); color: #0A0F1E; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    .video-done-msg { font-size: 16px; font-weight: 700; color: var(--secondary); margin: 16px 0 12px; text-align: center; }
+    .video-download-btn { display: block; text-align: center; background: var(--secondary); color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 700; margin-bottom: 16px; }
     .video-download-btn:hover { opacity: 0.85; }
-    .video-tips { background: var(--surface); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--text-sub); }
+    .video-tips { background: #FFF8E1; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--text-sub); }
     .video-error-msg { background: var(--bad-bg); color: var(--bad); padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; }
 
     /* 新機能ボタンエリア */
@@ -582,56 +567,56 @@
       display: flex; align-items: center; gap: 8px; transition: all .2s;
       font-family: "Noto Sans JP", sans-serif;
     }
-    .feature-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+    .feature-btn:hover { border-color: var(--primary); background: var(--primary-light); }
     .feature-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .feature-btn .btn-icon { font-size: 20px; }
 
     /* 90日アクションプラン */
     .action-plan-section { margin-top: 24px; }
-    .plan-card { background: var(--bg2); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .plan-card { background: var(--surface); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
     .plan-title { font-size: 18px; font-weight: 800; margin-bottom: 16px; color: var(--text); }
-    .plan-quick-wins { background: rgba(245,158,11,0.1); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .plan-quick-wins { background: var(--accent-light); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
     .plan-quick-wins h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--warn); }
     .plan-quick-wins label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; cursor: pointer; }
     .plan-quick-wins input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--warn); }
-    .plan-kpis { background: var(--accent-light); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
-    .plan-kpis h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+    .plan-kpis { background: var(--secondary-light); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .plan-kpis h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--secondary); }
     .plan-kpis li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 20px; color: var(--text-sub); }
     .plan-timeline { display: flex; flex-direction: column; gap: 0; }
     .plan-week {
       border-left: 4px solid var(--border); padding: 12px 16px 12px 20px;
       position: relative; cursor: pointer; transition: background .2s;
     }
-    .plan-week:hover { background: var(--surface); }
+    .plan-week:hover { background: #F1F3F4; }
     .plan-week::before {
       content: ''; position: absolute; left: -8px; top: 18px;
       width: 12px; height: 12px; border-radius: 50%; background: var(--border);
     }
     .plan-week.phase-green { border-left-color: #00C896; }
     .plan-week.phase-green::before { background: #00C896; }
-    .plan-week.phase-blue { border-left-color: #3B82F6; }
-    .plan-week.phase-blue::before { background: #3B82F6; }
+    .plan-week.phase-blue { border-left-color: #1A73E8; }
+    .plan-week.phase-blue::before { background: #1A73E8; }
     .plan-week.phase-purple { border-left-color: #A855F7; }
     .plan-week.phase-purple::before { background: #A855F7; }
     .plan-week-header { display: flex; align-items: center; gap: 10px; }
     .plan-week-label { font-size: 14px; font-weight: 700; }
-    .plan-week-theme { font-size: 12px; color: var(--text-sub); background: var(--surface); padding: 2px 8px; border-radius: 4px; }
+    .plan-week-theme { font-size: 12px; color: var(--text-sub); background: #F1F3F4; padding: 2px 8px; border-radius: 4px; }
     .plan-week-tasks { margin-top: 8px; display: none; }
     .plan-week.open .plan-week-tasks { display: block; }
     .plan-week-tasks li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 16px; color: var(--text-sub); }
 
     /* 競合分析 */
     .competitor-section { margin-top: 24px; }
-    .competitor-card { background: var(--bg2); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .competitor-card { background: var(--surface); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
     .competitor-title { font-size: 18px; font-weight: 800; margin-bottom: 16px; color: var(--text); }
     .competitor-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .competitor-table th { background: var(--surface); padding: 10px 12px; text-align: left; font-weight: 700; font-size: 12px; color: var(--text-sub); }
+    .competitor-table th { background: #F1F3F4; padding: 10px 12px; text-align: left; font-weight: 700; font-size: 12px; color: var(--text-sub); }
     .competitor-table td { padding: 10px 12px; border-top: 1px solid var(--border); }
-    .competitor-table tr.highlight { background: var(--accent-light); }
-    .competitor-table tr.highlight td { font-weight: 700; color: var(--accent); }
-    .comp-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 8px; width: 80px; display: inline-block; vertical-align: middle; margin-left: 6px; }
+    .competitor-table tr.highlight { background: var(--primary-light); }
+    .competitor-table tr.highlight td { font-weight: 700; color: var(--primary); }
+    .comp-bar-wrap { background: #F1F3F4; border-radius: 4px; height: 8px; width: 80px; display: inline-block; vertical-align: middle; margin-left: 6px; }
     .comp-bar-fill { height: 100%; border-radius: 4px; transition: width .5s; }
-    .competitor-advice { margin-top: 16px; padding: 16px; background: var(--surface); border-radius: 12px; }
+    .competitor-advice { margin-top: 16px; padding: 16px; background: #F1F3F4; border-radius: 12px; }
     .competitor-advice h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
     .competitor-advice li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 20px; color: var(--text-sub); }
 
@@ -639,9 +624,9 @@
     .chat-fab {
       position: fixed; bottom: 24px; right: 24px; z-index: 1000;
       width: 56px; height: 56px; border-radius: 50%;
-      background: var(--accent); color: #0A0F1E; border: none;
+      background: var(--primary); color: #fff; border: none;
       font-size: 24px; cursor: pointer;
-      box-shadow: 0 4px 16px var(--accent-glow);
+      box-shadow: 0 4px 16px rgba(26,115,232,0.4);
       display: flex; align-items: center; justify-content: center;
       transition: transform .2s;
     }
@@ -649,18 +634,18 @@
     .chat-fab.hidden { display: none; }
     .chat-panel {
       position: fixed; bottom: 90px; right: 24px; z-index: 1001;
-      width: 340px; height: 460px; background: var(--bg2);
-      border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      width: 340px; height: 460px; background: var(--surface);
+      border-radius: 16px; box-shadow: var(--shadow-md);
       display: none; flex-direction: column; overflow: hidden;
       border: 1px solid var(--border);
     }
     .chat-panel.open { display: flex; }
     .chat-header {
-      padding: 14px 16px; background: var(--accent); color: #0A0F1E;
+      padding: 14px 16px; background: var(--primary); color: #fff;
       display: flex; align-items: center; justify-content: space-between;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
     }
-    .chat-close { background: none; border: none; color: #0A0F1E; font-size: 20px; cursor: pointer; padding: 0 4px; }
+    .chat-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 0 4px; }
     .chat-messages {
       flex: 1; overflow-y: auto; padding: 12px;
       display: flex; flex-direction: column; gap: 8px;
@@ -669,9 +654,9 @@
       max-width: 85%; padding: 10px 14px; border-radius: 12px;
       font-size: 13px; line-height: 1.6; word-break: break-word;
     }
-    .chat-msg.user { align-self: flex-end; background: var(--accent); color: #0A0F1E; border-bottom-right-radius: 4px; }
-    .chat-msg.assistant { align-self: flex-start; background: var(--surface); color: var(--text); border-bottom-left-radius: 4px; }
-    .chat-msg.loading { align-self: flex-start; background: var(--surface); color: var(--muted); font-style: italic; }
+    .chat-msg.user { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-msg.assistant { align-self: flex-start; background: #F1F3F4; color: var(--text); border-bottom-left-radius: 4px; }
+    .chat-msg.loading { align-self: flex-start; background: #F1F3F4; color: var(--muted); font-style: italic; }
     .chat-input-area {
       display: flex; gap: 8px; padding: 12px;
       border-top: 1px solid var(--border); flex-shrink: 0;
@@ -682,9 +667,9 @@
       font-family: "Noto Sans JP", sans-serif;
       background: var(--surface); color: var(--text);
     }
-    .chat-input:focus { border-color: var(--accent); }
+    .chat-input:focus { border-color: var(--primary); }
     .chat-send {
-      background: var(--accent); color: #0A0F1E; border: none;
+      background: var(--primary); color: #fff; border: none;
       border-radius: 8px; padding: 10px 14px; font-size: 13px;
       font-weight: 700; cursor: pointer; white-space: nowrap;
     }
@@ -697,49 +682,13 @@
     .fade-up { animation: fadeUp 0.5s ease-out forwards; opacity: 0; }
     .hidden { display: none !important; }
 
-    /* インラインチャット（タブ内） */
-    .inline-chat-container {
-      max-width: 700px; margin: 0 auto;
-      background: var(--card); border-radius: 16px;
-      border: 1px solid var(--border);
-      overflow: hidden;
-    }
-    .inline-chat-messages {
-      min-height: 300px; max-height: 500px;
-      overflow-y: auto; padding: 16px;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .inline-chat-messages .chat-msg {
-      max-width: 85%; padding: 10px 14px;
-      border-radius: 12px; font-size: 14px; line-height: 1.5;
-    }
-    .inline-chat-messages .chat-msg.user {
-      align-self: flex-end; background: var(--accent); color: #0A0F1E;
-    }
-    .inline-chat-messages .chat-msg.assistant {
-      align-self: flex-start; background: rgba(255,255,255,0.08); color: var(--text);
-    }
-    .inline-chat-messages .chat-msg.loading {
-      align-self: flex-start; background: rgba(255,255,255,0.05);
-      color: var(--muted); font-style: italic;
-    }
-
-    /* 確認済みビジネス名バッジ */
-    .confirmed-biz-badge {
-      display: inline-block; margin-bottom: 12px;
-      padding: 8px 16px; border-radius: 8px;
-      background: rgba(0, 200, 120, 0.12);
-      border: 1px solid rgba(0, 200, 120, 0.3);
-      color: #00c878; font-size: 14px; font-weight: 600;
-    }
-
     .site-footer {
       text-align: center; padding: 24px;
-      font-size: 12px; color: var(--muted);
+      font-size: 12px; color: var(--text-sub);
       border-top: 1px solid var(--border); margin-top: 0;
     }
 
-    /* ===== PC対応 ===== */
+    /* PC対応 */
     @media (min-width: 769px) {
       .tab-container { max-width: 900px; padding: 0 20px; }
       .form-wrap { max-width: 700px; }
@@ -750,11 +699,13 @@
       #detailCards .detail-card { margin-bottom: 0; }
     }
 
-    /* ===== モバイル対応 ===== */
+    /* モバイル対応 */
     @media (max-width: 768px) {
       .site-header { padding: 10px 16px; }
       .site-header .logo { font-size: 18px; }
       .hero { padding: 40px 16px 30px; }
+      .hero-title-row { flex-direction: column; gap: 8px; }
+      .cat-mascot { width: 60px; height: 60px; }
       .tab-container { padding: 0 12px; }
       .tab-btn { font-size: 13px; padding: 10px 14px; }
       .tab-content { padding: 0 0 24px; }
@@ -796,7 +747,7 @@
   <!-- ヘッダー -->
   <header class="site-header">
     <div class="logo">
-      <span class="accent">ZETT-AI</span>
+      <span class="blue">ZETT-AI</span>
     </div>
     <span class="subtitle">Googleマップ × AI検索 最適化診断</span>
   </header>
@@ -806,7 +757,26 @@
 
     <!-- ヒーロー -->
     <div class="hero">
-      <h1>「AIのことなら<span class="accent">ZETT-AI（絶対）</span>」</h1>
+      <div class="hero-title-row">
+        <h1>「AIのことなら<span class="blue">ZETT-AI（絶対）</span>」</h1>
+        <svg class="cat-mascot" viewBox="0 0 80 80" width="80" height="80" xmlns="http://www.w3.org/2000/svg">
+          <rect x="15" y="30" width="50" height="40" rx="8" fill="#1A73E8"/>
+          <rect x="18" y="8" width="44" height="36" rx="8" fill="#1A73E8"/>
+          <polygon points="18,14 10,2 26,8" fill="#1A73E8"/>
+          <polygon points="62,14 70,2 54,8" fill="#1A73E8"/>
+          <polygon points="18,13 12,4 24,9" fill="#5B9CF6"/>
+          <polygon points="62,13 68,4 56,9" fill="#5B9CF6"/>
+          <circle cx="30" cy="24" r="5" fill="white"/>
+          <circle cx="50" cy="24" r="5" fill="white"/>
+          <circle cx="31" cy="25" r="3" fill="#1A1A2E"/>
+          <circle cx="51" cy="25" r="3" fill="#1A1A2E"/>
+          <ellipse cx="40" cy="33" rx="3" ry="2" fill="#FF6B9D"/>
+          <path d="M37 36 Q40 39 43 36" stroke="#1A1A2E" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M65 60 Q80 50 75 40" stroke="#1565C0" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <rect x="20" y="65" width="16" height="12" rx="6" fill="#1565C0"/>
+          <rect x="44" y="65" width="16" height="12" rx="6" fill="#1565C0"/>
+        </svg>
+      </div>
       <p class="hero-sub">GoogleマップのURLを貼るだけ。<br>AIがあなたのお店の集客力を診断します。</p>
       <span class="hero-badge">登録不要・無料・30秒で完了</span>
 
@@ -814,7 +784,6 @@
         <div class="tabs">
           <button class="tab-btn active" data-tab="web" onclick="switchTab('web')">🌐 Webサイト診断</button>
           <button class="tab-btn" data-tab="gbp" onclick="switchTab('gbp')">📍 Googleマップ診断（GBP）</button>
-          <button class="tab-btn" data-tab="chat" onclick="switchTab('chat')">💬 AIチャット</button>
         </div>
 
         <div id="tabWeb" class="tab-content active">
@@ -836,30 +805,16 @@
             <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>g.page</code></p>
           </div>
         </div>
-
-        <div id="tabChat" class="tab-content">
-          <div style="padding-top:24px;">
-            <div class="inline-chat-container">
-              <div id="inline-chat-messages" class="inline-chat-messages">
-                <div class="chat-msg assistant">GBPやローカルSEOについて何でも聞いてください。診断なしでもお気軽にどうぞ！</div>
-              </div>
-              <div class="chat-input-area" style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
-                <input type="text" id="inline-chat-input" class="chat-input" placeholder="GBPやローカルSEOについて何でも聞いてください..." onkeydown="if(event.key==='Enter')sendInlineChatMessage()">
-                <button class="chat-send" onclick="sendInlineChatMessage()" id="inline-chat-send-btn">送信</button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
-    <!-- Section 2: サンプルレポートプレビュー -->
+    <!-- サンプルレポートプレビュー -->
     <div class="lp-section">
-      <p class="lp-section-title">📊 こんな診断レポートが出ます</p>
+      <p class="lp-section-title">📊 診断するとこんなレポートが出ます</p>
       <p class="lp-section-sub">URLを入力するだけで、6つの視点からAIが自動診断</p>
 
       <div class="sample-report">
-        <span class="sample-badge">← 実際の診断結果サンプル</span>
+        <span class="sample-badge">サンプル</span>
         <p class="sample-biz-name">焼肉 炭火苑 新宿店</p>
         <div class="sample-score-row">
           <div class="sample-score-circle">
@@ -872,7 +827,6 @@
           </div>
         </div>
 
-        <!-- カテゴリバー -->
         <div style="margin-bottom:20px;">
           <div class="s-bar-row">
             <span class="s-bar-label">プロフィール完成度</span>
@@ -912,7 +866,6 @@
           </div>
         </div>
 
-        <!-- TOP3アクション -->
         <div class="sample-actions">
           <div class="sample-action">
             <span class="emoji">🔴</span>
@@ -930,8 +883,8 @@
       </div>
     </div>
 
-    <!-- Section 3: 90日アクションプランサンプル -->
-    <div class="lp-section" style="background:var(--bg2);max-width:100%;padding-left:0;padding-right:0;">
+    <!-- 90日アクションプランサンプル -->
+    <div class="lp-section" style="background:#F1F3F4;max-width:100%;padding-left:0;padding-right:0;">
       <div style="max-width:900px;margin:0 auto;padding:0 24px;">
         <p class="lp-section-title">📅 90日アクションプランも自動生成</p>
         <p class="lp-section-sub">診断結果から、あなたの店舗に合った具体的な改善ステップを自動作成</p>
@@ -962,17 +915,10 @@
             </ul>
           </div>
         </div>
-
-        <div class="quick-win-sample">
-          <h4>✅ クイックウィン（今日できること）</h4>
-          <div class="qw-check"><span class="box"></span>Googleビジネスプロフィールにログインして営業時間を確認・更新</div>
-          <div class="qw-check"><span class="box"></span>店舗の外観・内観写真をスマホで5枚撮影してアップロード</div>
-          <div class="qw-check"><span class="box"></span>未返信のクチコミ1件に返信する</div>
-        </div>
       </div>
     </div>
 
-    <!-- Section 4: AIチャットプレビュー -->
+    <!-- AIチャットプレビュー -->
     <div class="lp-section">
       <p class="lp-section-title">💬 診断後はAIに質問もできます</p>
       <p class="lp-section-sub">診断結果をもとにAIが具体的なアドバイスをします</p>
@@ -981,14 +927,14 @@
         <div class="chat-preview-header">💬 GBP AIアシスタント</div>
         <div class="chat-preview-body">
           <div class="chat-bubble user">写真はどんなものを撮ればいいですか？</div>
-          <div class="chat-bubble ai">外観・内観・料理・スタッフの4種類を各5枚ずつ、合計20枚が目安です。明るい自然光で撮影し、解像度720px以上を推奨します。特に料理写真はGBPの表示で最も目を引くため、盛り付けにこだわった写真を優先してください。</div>
+          <div class="chat-bubble ai">外観・内観・料理・スタッフの4種類を各5枚ずつ撮影するのがおすすめです。明るい時間帯の自然光で撮影し、解像度720px以上を推奨します。</div>
         </div>
       </div>
       <p class="chat-preview-caption">診断完了後、チャットボタンから何でも質問できます</p>
     </div>
 
-    <!-- Section 5: 特徴カード -->
-    <div class="lp-section" style="background:var(--bg2);max-width:100%;padding-left:0;padding-right:0;">
+    <!-- 特徴カード -->
+    <div class="lp-section" style="background:#F1F3F4;max-width:100%;padding-left:0;padding-right:0;">
       <div style="max-width:900px;margin:0 auto;padding:0 24px;">
         <div class="feature-cards">
           <div class="feat-card">
@@ -1069,28 +1015,21 @@
     </div>
 
     <div class="sep"></div>
-
     <div class="fade-up" style="animation-delay: 0.2s;">
       <p id="metricsTitle" class="section-title">評価指標</p>
       <div id="metricsGrid" class="metrics-grid"></div>
     </div>
-
     <div class="sep"></div>
-
     <div class="fade-up" style="animation-delay: 0.3s;">
       <p class="section-title">詳細レポート</p>
       <div id="detailCards"></div>
     </div>
-
     <div class="sep"></div>
-
     <div class="fade-up" style="animation-delay: 0.4s;">
       <p class="section-title">今すぐやること TOP3</p>
       <div id="topActions"></div>
     </div>
-
     <div class="sep"></div>
-
     <div id="practicalGuideSection" class="fade-up" style="animation-delay: 0.5s; display: none;">
       <p class="section-title">🛠️ 実践ガイド（今日からできること）</p>
       <div id="practicalGuideContent"></div>
@@ -1107,8 +1046,8 @@
           </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button id="btn-normal" class="video-start-btn" onclick="startVideoGeneration(false)" style="flex:1;background:var(--accent);color:#0A0F1E">🎬 ノーマル動画</button>
-          <button id="btn-sparkle" class="video-start-btn" onclick="startVideoGeneration(true)" style="flex:1;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff">✨ キラキラ動画</button>
+          <button id="btn-normal" class="video-start-btn" onclick="startVideoGeneration(false)" style="flex:1;background:#1A73E8">🎬 ノーマル動画</button>
+          <button id="btn-sparkle" class="video-start-btn" onclick="startVideoGeneration(true)" style="flex:1;background:linear-gradient(135deg,#f093fb,#f5576c)">✨ キラキラ動画</button>
         </div>
         <div id="video-progress" style="display:none">
           <div class="progress-bar-wrap">
@@ -1125,9 +1064,9 @@
         <div id="video-mail-section" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
           <div style="font-weight:700;font-size:14px;margin-bottom:12px">📧 お客様へ直接メール送信</div>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <input type="text" id="video-biz-name" placeholder="店舗名・会社名" style="padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface);color:var(--text)">
-            <input type="email" id="video-email" placeholder="お客様のメールアドレス" style="padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface);color:var(--text)">
-            <button onclick="sendVideoMail()" style="background:var(--accent);color:#0A0F1E;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif" id="video-send-btn">送信する</button>
+            <input type="text" id="video-biz-name" placeholder="店舗名・会社名" style="padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+            <input type="email" id="video-email" placeholder="お客様のメールアドレス" style="padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+            <button onclick="sendVideoMail()" style="background:var(--secondary);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer" id="video-send-btn">送信する</button>
           </div>
           <div id="video-mail-msg" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:13px"></div>
         </div>
@@ -1166,11 +1105,11 @@
     <div id="gbp-report-actions" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
       <div style="font-weight:700;font-size:14px;margin-bottom:12px">📋 レポートを共有</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <button onclick="copyReportType('gbp')" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-copy-btn">📋 コピー</button>
+        <button onclick="copyReportType('gbp')" style="background:#F1F3F4;color:var(--text);border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-copy-btn">📋 コピー</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="email" id="gbp-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)">
-        <button onclick="sendReportEmail('gbp')" style="background:var(--accent);color:#0A0F1E;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-send-btn">📧 メールで送信</button>
+        <input type="email" id="gbp-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <button onclick="sendReportEmail('gbp')" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-send-btn">📧 メールで送信</button>
       </div>
       <div id="gbp-report-msg" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:13px"></div>
     </div>
@@ -1178,11 +1117,11 @@
     <div id="geo-report-actions" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
       <div style="font-weight:700;font-size:14px;margin-bottom:12px">📋 レポートを共有</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <button onclick="copyReportType('geo')" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-copy-btn">📋 コピー</button>
+        <button onclick="copyReportType('geo')" style="background:#F1F3F4;color:var(--text);border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-copy-btn">📋 コピー</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="email" id="geo-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)">
-        <button onclick="sendReportEmail('geo')" style="background:var(--accent);color:#0A0F1E;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-send-btn">📧 メールで送信</button>
+        <input type="email" id="geo-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <button onclick="sendReportEmail('geo')" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-send-btn">📧 メールで送信</button>
       </div>
       <div id="geo-report-msg" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:13px"></div>
     </div>
@@ -1243,8 +1182,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
-  const tabMap = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat' };
-  document.getElementById(tabMap[tab]).classList.add('active');
+  document.getElementById(tab === 'web' ? 'tabWeb' : 'tabGbp').classList.add('active');
 }
 
 function scoreColor(score) {
@@ -1307,11 +1245,13 @@ async function runAnalysis(url, endpoint, mode) {
     { main: 'AIが分析中... (5/6)', detail: 'ローカルSEOを評価中...' },
     { main: 'AIが分析中... (6/6)', detail: '改善レポートを生成中...' }
   ];
+
   let stepIndex = 0;
   const stepEl = document.getElementById('loadingStep');
   const detailEl = document.getElementById('loadingStepDetail');
   stepEl.textContent = steps[0].main;
   detailEl.textContent = steps[0].detail;
+
   const stepInterval = setInterval(() => {
     stepIndex++;
     if (stepIndex < steps.length) {
@@ -1322,6 +1262,7 @@ async function runAnalysis(url, endpoint, mode) {
       detailEl.classList.add('step-animate');
     }
   }, 1500);
+
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -1329,10 +1270,18 @@ async function runAnalysis(url, endpoint, mode) {
       body: JSON.stringify({ url })
     });
     const data = await response.json();
-    if (data.error) { clearInterval(stepInterval); showError(data.error); return; }
+    if (data.error) {
+      clearInterval(stepInterval);
+      showError(data.error);
+      return;
+    }
     const result = await pollAnalyzeStatus(data.job_id);
     clearInterval(stepInterval);
-    if (result) { lastResult = result; lastResult._mode = mode; showResults(result, mode); }
+    if (result) {
+      lastResult = result;
+      lastResult._mode = mode;
+      showResults(result, mode);
+    }
   } catch (err) {
     clearInterval(stepInterval);
     showError('通信エラーが発生しました。もう一度お試しください。');
@@ -1394,29 +1343,15 @@ function showResults(data, mode) {
   document.getElementById('resultUrl').textContent = displayName;
   document.getElementById('resultDate').textContent = '分析日時: ' + new Date().toLocaleString('ja-JP');
 
-  // 確認済みビジネス名バッジ表示
-  let confirmBadge = document.getElementById('confirmedBizBadge');
-  if (!confirmBadge) {
-    confirmBadge = document.createElement('div');
-    confirmBadge.id = 'confirmedBizBadge';
-    confirmBadge.className = 'confirmed-biz-badge';
-    document.getElementById('resultUrl').parentNode.insertBefore(confirmBadge, document.getElementById('resultUrl'));
-  }
-  if (mode === 'gbp' && data.confirmed_business_name) {
-    confirmBadge.textContent = '✅ 店舗を確認しました: ' + data.confirmed_business_name;
-    confirmBadge.style.display = 'inline-block';
-  } else {
-    confirmBadge.style.display = 'none';
-  }
-
   const newsCard = document.getElementById('gbpNewsCard');
   if (mode === 'gbp' && data.gbp_news) {
     newsCard.style.display = 'block';
     document.getElementById('gbpNewsText').textContent = data.gbp_news;
-  } else { newsCard.style.display = 'none'; }
+  } else {
+    newsCard.style.display = 'none';
+  }
 
   document.getElementById('summaryText').textContent = data.summary || '';
-
   const target = data.overall_score;
   const color = scoreColor(target);
   const scoreEl = document.getElementById('scoreNumber');
@@ -1430,9 +1365,13 @@ function showResults(data, mode) {
 
   const gradeEl = document.getElementById('gradeLabel');
   gradeEl.textContent = data.grade;
-  if (target >= 80) { gradeEl.style.background = 'var(--good-bg)'; gradeEl.style.color = 'var(--good)'; }
-  else if (target >= 50) { gradeEl.style.background = 'var(--warn-bg)'; gradeEl.style.color = 'var(--warn)'; }
-  else { gradeEl.style.background = 'var(--bad-bg)'; gradeEl.style.color = 'var(--bad)'; }
+  if (target >= 80) {
+    gradeEl.style.background = 'var(--good-bg)'; gradeEl.style.color = 'var(--good)';
+  } else if (target >= 50) {
+    gradeEl.style.background = 'var(--warn-bg)'; gradeEl.style.color = 'var(--warn)';
+  } else {
+    gradeEl.style.background = 'var(--bad-bg)'; gradeEl.style.color = 'var(--bad)';
+  }
 
   const catIcons = mode === 'gbp' ? GBP_CATEGORY_ICONS : WEB_CATEGORY_ICONS;
   const catNames = mode === 'gbp' ? GBP_CATEGORY_NAMES : WEB_CATEGORY_NAMES;
@@ -1452,13 +1391,7 @@ function showResults(data, mode) {
     const name = catNames[key] || cat.title;
     const row = document.createElement('div');
     row.className = 'metric-row';
-    row.innerHTML = `
-      <span class="metric-icon">${icon}</span>
-      <span class="metric-name">${name}</span>
-      <div class="metric-bar-wrap"><div class="metric-bar-fill" style="background:${barColor};"></div></div>
-      <span class="metric-score" style="color:${barColor};">${cat.score}</span>
-      <span class="metric-badge ${badge.cls}">${badge.text}</span>
-    `;
+    row.innerHTML = `<span class="metric-icon">${icon}</span><span class="metric-name">${name}</span><div class="metric-bar-wrap"><div class="metric-bar-fill" style="background:${barColor};"></div></div><span class="metric-score" style="color:${barColor};">${cat.score}</span><span class="metric-badge ${badge.cls}">${badge.text}</span>`;
     metricsEl.appendChild(row);
     setTimeout(() => { row.querySelector('.metric-bar-fill').style.width = cat.score + '%'; }, 300 + i * 120);
   });
@@ -1476,15 +1409,7 @@ function showResults(data, mode) {
     }
     const card = document.createElement('div');
     card.className = 'detail-card';
-    card.innerHTML = `
-      <div class="card-head">
-        <div class="card-title"><span>${icon}</span><span>${cat.title}</span><span class="metric-badge ${badge.cls}">${badge.text}</span></div>
-        <span class="card-score" style="color:${barColor};">${cat.score}<span style="font-size:12px;color:var(--text-sub);font-weight:500;"> / 100</span></span>
-      </div>
-      <div class="card-bar-wrap"><div class="card-bar-fill" style="background:${barColor};"></div></div>
-      <p class="card-detail">${cat.detail}</p>
-      ${recsHtml}
-    `;
+    card.innerHTML = `<div class="card-head"><div class="card-title"><span>${icon}</span><span>${cat.title}</span><span class="metric-badge ${badge.cls}">${badge.text}</span></div><span class="card-score" style="color:${barColor};">${cat.score}<span style="font-size:12px;color:var(--text-sub);font-weight:500;"> / 100</span></span></div><div class="card-bar-wrap"><div class="card-bar-fill" style="background:${barColor};"></div></div><p class="card-detail">${cat.detail}</p>${recsHtml}`;
     cardsEl.appendChild(card);
     setTimeout(() => { card.querySelector('.card-bar-fill').style.width = cat.score + '%'; }, 600 + i * 150);
   });
@@ -1501,6 +1426,7 @@ function showResults(data, mode) {
     });
   }
 
+  // 実践ガイド
   const guideSection = document.getElementById('practicalGuideSection');
   const guideContent = document.getElementById('practicalGuideContent');
   if (data.practical_guide) {
@@ -1528,13 +1454,13 @@ function showResults(data, mode) {
     if (pg.gbp_post_sample) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">📢 GBP投稿サンプル（今すぐ使える）</p><div class="guide-text-block" style="position:relative;"><span id="gbpPostText">${escapeHtml(pg.gbp_post_sample)}</span><button class="copy-code-btn" style="top:8px;right:8px;background:rgba(255,255,255,0.1);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('gbpPostText', this)">コピー</button></div></div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">📢 GBP投稿サンプル（今すぐ使える）</p><div class="guide-text-block" style="position:relative;"><span id="gbpPostText">${escapeHtml(pg.gbp_post_sample)}</span><button class="copy-code-btn" style="top:8px;right:8px;background:rgba(0,0,0,0.08);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('gbpPostText', this)">コピー</button></div></div>`;
       guideContent.appendChild(block);
     }
     if (pg.response_template) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">💬 クチコミ返信テンプレート</p><div class="guide-text-block" style="position:relative;"><span id="responseTemplateText">${escapeHtml(pg.response_template)}</span><button class="copy-code-btn" style="top:8px;right:8px;background:rgba(255,255,255,0.1);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('responseTemplateText', this)">コピー</button></div></div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">💬 クチコミ返信テンプレート</p><div class="guide-text-block" style="position:relative;"><span id="responseTemplateText">${escapeHtml(pg.response_template)}</span><button class="copy-code-btn" style="top:8px;right:8px;background:rgba(0,0,0,0.08);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('responseTemplateText', this)">コピー</button></div></div>`;
       guideContent.appendChild(block);
     }
     if (pg.quick_wins && pg.quick_wins.length > 0) {
@@ -1549,32 +1475,33 @@ function showResults(data, mode) {
       block.innerHTML = html;
       guideContent.appendChild(block);
     }
-  } else { guideSection.style.display = 'none'; }
+  } else {
+    guideSection.style.display = 'none';
+  }
 
+  // GBP診断結果表示後に動画・新機能セクションを表示
   if (mode === 'gbp') {
     showVideoSection(data.analyzed_url || '');
     currentGbpBusinessName = data.business_name || "";
+    document.getElementById('action-plan-area').style.display = 'none';
+    document.getElementById('competitor-area').style.display = 'none';
+    document.getElementById('new-features-area').style.display = 'block';
+    document.getElementById('chat-fab').classList.remove('hidden');
     const gbpActions = document.getElementById("gbp-report-actions");
     if (gbpActions) gbpActions.style.display = "block";
     const geoActions2 = document.getElementById("geo-report-actions");
     if (geoActions2) geoActions2.style.display = "none";
-    document.getElementById('new-features-area').style.display = 'block';
-    document.getElementById('action-plan-area').style.display = 'none';
-    document.getElementById('competitor-area').style.display = 'none';
-    document.getElementById('chat-fab').classList.remove('hidden');
-    chatHistory = []; chatInitialized = false;
-    document.getElementById('chat-messages').innerHTML = '';
   } else {
     document.getElementById('video-section').style.display = 'none';
     document.getElementById('new-features-area').style.display = 'none';
     document.getElementById('chat-fab').classList.add('hidden');
     document.getElementById('chat-panel').classList.remove('open');
-    chatOpen = false;
     const geoActions = document.getElementById("geo-report-actions");
     if (geoActions) geoActions.style.display = "block";
     const gbpActions2 = document.getElementById("gbp-report-actions");
     if (gbpActions2) gbpActions2.style.display = "none";
   }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1616,9 +1543,11 @@ function backToForm() {
   document.getElementById('gaugeFill').style.strokeDashoffset = 408;
   document.getElementById('chat-fab').classList.add('hidden');
   document.getElementById('chat-panel').classList.remove('open');
-  chatOpen = false;
-  if (currentMode === 'gbp') { document.getElementById('gbpUrlInput').focus(); }
-  else { document.getElementById('webUrlInput').focus(); }
+  if (currentMode === 'gbp') {
+    document.getElementById('gbpUrlInput').focus();
+  } else {
+    document.getElementById('webUrlInput').focus();
+  }
 }
 
 function copyReport() {
@@ -1647,7 +1576,7 @@ function copyReport() {
   });
 }
 
-// ===== 動画生成 =====
+// ===== 動画生成機能 =====
 let currentVideoJobId = null;
 let videoPollingTimer = null;
 let currentGbpUrl = "";
@@ -1681,10 +1610,8 @@ async function startVideoGeneration(sparkle) {
     pollVideoStatus();
   } catch (e) { showVideoError("通信エラーが発生しました"); }
   finally {
-    const bn = document.getElementById("btn-normal");
-    const bs = document.getElementById("btn-sparkle");
-    if (bn) bn.disabled = false;
-    if (bs) bs.disabled = false;
+    if (btnNormal) btnNormal.disabled = false;
+    if (btnSparkle) btnSparkle.disabled = false;
   }
 }
 
@@ -1695,8 +1622,10 @@ function pollVideoStatus() {
       const res = await fetch("/api/video-status/" + currentVideoJobId);
       const data = await res.json();
       const statusMap = {
-        "pending": [5, "準備中..."], "scraping": [25, "GoogleマップのAI写真を取得中..."],
-        "downloading": [55, "写真をダウンロード中..."], "encoding": [80, "動画をエンコード中..."],
+        "pending": [5, "準備中..."],
+        "scraping": [25, "GoogleマップのAI写真を取得中..."],
+        "downloading": [55, "写真をダウンロード中..."],
+        "encoding": [80, "動画をエンコード中..."],
         "done": [100, "完成！"],
       };
       const [pct, msg] = statusMap[data.status] || [data.progress || 0, "処理中..."];
@@ -1727,7 +1656,7 @@ function showVideoError(msg) {
   errEl.style.display = "block";
 }
 
-// ===== レポート共有 =====
+// ===== レポート共有・メール送信 =====
 let currentGbpBusinessName = "";
 
 function copyReportType(type) {
@@ -1751,7 +1680,8 @@ async function sendReportEmail(type) {
   btn.disabled = true; btn.textContent = "送信中...";
   try {
     const res = await fetch("/api/send-report", {
-      method: "POST", headers: {"Content-Type": "application/json"},
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify({email, business_name: bizName, report_html: reportHtml, report_type: rtype})
     });
     const d = await res.json();
@@ -1769,7 +1699,8 @@ async function sendVideoMail() {
   btn.disabled = true; btn.textContent = "送信中...";
   try {
     const res = await fetch("/api/send-video", {
-      method: "POST", headers: {"Content-Type": "application/json"},
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify({job_id: currentVideoJobId, email, business_name: name})
     });
     const d = await res.json();
@@ -1863,7 +1794,7 @@ function renderCompetitorAnalysis(data) {
   const maxScore = Math.max(...allScores, 1);
   let chartHtml = '<div style="display:flex;flex-direction:column;gap:8px">';
   const myPct = ((lastResult.overall_score||0)/maxScore*100).toFixed(0);
-  chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:100px;font-weight:700;color:var(--accent);text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(lastResult.business_name||'あなたの店')}</span><div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${myPct}%;background:var(--accent)"></div></div><span style="font-weight:700;color:var(--accent)">${lastResult.overall_score||0}</span></div>`;
+  chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:100px;font-weight:700;color:var(--primary);text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(lastResult.business_name||'あなたの店')}</span><div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${myPct}%;background:var(--primary)"></div></div><span style="font-weight:700;color:var(--primary)">${lastResult.overall_score||0}</span></div>`;
   comps.forEach(c => {
     const pct = ((c.estimated_score||0)/maxScore*100).toFixed(0);
     chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:100px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(c.name)}</span><div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${pct}%;background:var(--muted)"></div></div><span>${c.estimated_score||0}</span></div>`;
@@ -1929,55 +1860,6 @@ async function sendChatMessageText(msg) {
     loadingBubble.remove();
     const reply = data.reply || data.error || 'エラーが発生しました';
     chatHistory.push({role: 'assistant', content: reply});
-    const aiBubble = document.createElement('div');
-    aiBubble.className = 'chat-msg assistant';
-    aiBubble.innerHTML = escapeHtml(reply).replace(/\n/g, '<br>');
-    messagesEl.appendChild(aiBubble);
-  } catch(e) {
-    loadingBubble.remove();
-    const errBubble = document.createElement('div');
-    errBubble.className = 'chat-msg assistant';
-    errBubble.textContent = '通信エラーが発生しました';
-    messagesEl.appendChild(errBubble);
-  }
-  sendBtn.disabled = false;
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-// ===== インラインチャット（タブ内）=====
-let inlineChatHistory = [];
-
-function sendInlineChatMessage() {
-  const input = document.getElementById('inline-chat-input');
-  const msg = input.value.trim();
-  if (!msg) return;
-  input.value = '';
-  sendInlineChatMessageText(msg);
-}
-
-async function sendInlineChatMessageText(msg) {
-  const messagesEl = document.getElementById('inline-chat-messages');
-  inlineChatHistory.push({role: 'user', content: msg});
-  const userBubble = document.createElement('div');
-  userBubble.className = 'chat-msg user';
-  userBubble.textContent = msg;
-  messagesEl.appendChild(userBubble);
-  const loadingBubble = document.createElement('div');
-  loadingBubble.className = 'chat-msg loading';
-  loadingBubble.textContent = '考え中...';
-  messagesEl.appendChild(loadingBubble);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-  const sendBtn = document.getElementById('inline-chat-send-btn');
-  sendBtn.disabled = true;
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ message: msg, context: {}, history: inlineChatHistory.slice(-10) })
-    });
-    const data = await res.json();
-    loadingBubble.remove();
-    const reply = data.reply || data.error || 'エラーが発生しました';
-    inlineChatHistory.push({role: 'assistant', content: reply});
     const aiBubble = document.createElement('div');
     aiBubble.className = 'chat-msg assistant';
     aiBubble.innerHTML = escapeHtml(reply).replace(/\n/g, '<br>');
