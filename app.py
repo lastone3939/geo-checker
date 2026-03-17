@@ -664,10 +664,13 @@ def get_query_from_url(url: str) -> tuple:
     place_id = None
     query = ""
     lat, lng = None, None
-    # 1. Place ID (ChIJ形式) を dataパラメータから抽出
-    pid_m = re.search(r"!1s(ChIJ[A-Za-z0-9_\-]+)", url)
+    # 1. Place ID を dataパラメータから抽出（ChIJ形式 + 0x旧形式の両方を捕捉）
+    pid_m = re.search(r"!1s((?:ChIJ|0x)[A-Za-z0-9_\-:]+)", url)
     if pid_m:
-        place_id = pid_m.group(1)
+        pid_candidate = pid_m.group(1)
+        # 0x形式（旧フォーマット）はPlaces APIで使えないため無視
+        if not pid_candidate.startswith("0x"):
+            place_id = pid_candidate
     # 2. /place/NAME/ からビジネス名
     name_m = re.search(r"/place/([^/@]+)", url)
     if name_m:
@@ -727,6 +730,11 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> tuple:
     photos = []
     verified_place_id = None
 
+    # 0x形式Place IDはPlaces APIで無効なのでテキスト検索にフォールバック
+    if place_id and place_id.startswith("0x"):
+        app.logger.info(f"0x形式Place ID検出、無視してテキスト検索へ: {place_id}")
+        place_id = None
+
     # ルート1: Place IDが取れた場合 → Place Details APIで直接取得（最正確）
     if place_id:
         app.logger.info(f"Places API: Place ID直接取得 {place_id}")
@@ -758,8 +766,8 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> tuple:
         app.logger.info(f"Places APIテキスト検索: query={query} lat={lat} lng={lng}")
         search_body = {"textQuery": query, "pageSize": 3}
         if lat and lng:
-            # locationRestriction（厳密な範囲制限）を使用 - 50m四方
-            delta = 0.00045  # 約50m
+            # locationRestriction（厳密な範囲制限）を使用 - 100m四方
+            delta = 0.0009  # 約100m
             search_body["locationRestriction"] = {
                 "rectangle": {
                     "low": {"latitude": lat - delta, "longitude": lng - delta},

@@ -3,38 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI検索GBP改善君 - Googleマップ × AI検索 最適化診断ツール</title>
+  <title>ZETT-AI | AIのことならZETT-AI（絶対）- Googleマップ × AI検索 最適化診断</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
   <style>
     :root {
-      --bg: #F8F9FA;
-      --surface: #FFFFFF;
-      --border: #E8EAED;
-      --text: #202124;
-      --text-sub: #5F6368;
-      --primary: #1A73E8;
-      --primary-light: #E8F0FE;
-      --secondary: #34A853;
-      --secondary-light: #E6F4EA;
-      --accent: #FBBC04;
-      --accent-light: #FEF7E0;
-      --danger: #EA4335;
-      --danger-light: #FCE8E6;
-      --good: #34A853;
-      --good-bg: #E6F4EA;
-      --warn: #FBBC04;
-      --warn-bg: #FEF7E0;
-      --bad: #EA4335;
-      --bad-bg: #FCE8E6;
-      --shadow: 0 1px 3px rgba(60,64,67,0.15), 0 1px 2px rgba(60,64,67,0.10);
-      --shadow-md: 0 4px 8px rgba(60,64,67,0.15), 0 2px 4px rgba(60,64,67,0.10);
+      --bg: #0A0F1E;
+      --bg2: #111827;
+      --surface: #1A2236;
+      --border: #2A3450;
+      --text: #F9FAFB;
+      --text-sub: #9CA3AF;
+      --muted: #6B7280;
+      --accent: #00C896;
+      --accent-light: rgba(0,200,150,0.12);
+      --accent-glow: rgba(0,200,150,0.3);
+      --primary: #00C896;
+      --primary-light: rgba(0,200,150,0.12);
+      --secondary: #00C896;
+      --secondary-light: rgba(0,200,150,0.12);
+      --warn: #F59E0B;
+      --warn-bg: rgba(245,158,11,0.15);
+      --bad: #EF4444;
+      --bad-bg: rgba(239,68,68,0.15);
+      --good: #00C896;
+      --good-bg: rgba(0,200,150,0.15);
+      --shadow: 0 2px 8px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: "Noto Sans JP", sans-serif;
       background: var(--bg);
@@ -44,149 +43,102 @@
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
+    a { color: var(--accent); text-decoration: none; }
 
-    /* ヘッダー */
+    /* ===== ヘッダー ===== */
     .site-header {
       padding: 14px 24px;
       border-bottom: 1px solid var(--border);
-      background: var(--surface);
+      background: var(--bg2);
       display: flex;
       align-items: center;
       gap: 12px;
     }
     .site-header .logo {
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--text);
+      font-size: 22px; font-weight: 800; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .site-header .logo .accent { color: var(--accent); }
+    .site-header .subtitle { font-size: 12px; color: var(--text-sub); font-weight: 500; }
+
+    /* ===== ヒーローセクション ===== */
+    .hero {
+      text-align: center;
+      padding: 60px 24px 40px;
+      background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 50% 0%, rgba(0,200,150,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 900;
       letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      line-height: 1.3;
+      margin-bottom: 16px;
+      position: relative;
     }
-    .site-header .logo .logo-icon {
-      font-size: 26px;
-    }
-    .site-header .logo .blue { color: var(--primary); }
-    .site-header .logo .green { color: var(--secondary); }
-    .site-header .logo .yellow { color: var(--accent); }
-    .site-header .logo .red { color: var(--danger); }
-    .site-header .subtitle {
-      font-size: 12px;
+    .hero h1 .accent { color: var(--accent); }
+    .hero .hero-sub {
+      font-size: clamp(14px, 2.5vw, 17px);
       color: var(--text-sub);
-      font-weight: 500;
+      max-width: 560px;
+      margin: 0 auto 20px;
+      line-height: 1.8;
     }
-
-    /* ニュースバナー */
-    .news-banner {
-      background: linear-gradient(135deg, #E8F0FE 0%, #E6F4EA 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 24px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .hero-badge {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
       font-size: 13px;
-      color: var(--text);
-      line-height: 1.6;
-    }
-    .news-banner .news-icon {
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-    .news-banner .news-date {
-      background: var(--primary);
-      color: #fff;
-      font-size: 11px;
       font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
-    .news-banner .news-text {
-      flex: 1;
-    }
-    .news-banner .news-text strong {
-      font-weight: 700;
-    }
-    @media (max-width: 600px) {
-      .news-banner { flex-wrap: wrap; font-size: 12px; }
+      padding: 6px 18px;
+      border-radius: 20px;
+      margin-bottom: 32px;
+      border: 1px solid rgba(0,200,150,0.25);
     }
 
-    /* タブUI */
+    /* ===== タブUI ===== */
     .tab-container {
       max-width: 640px;
       margin: 0 auto;
       padding: 0 24px;
+      position: relative;
     }
     .tabs {
-      display: flex;
-      gap: 0;
-      margin-top: 32px;
+      display: flex; gap: 0;
       border-bottom: 2px solid var(--border);
+      margin-bottom: 24px;
     }
     .tab-btn {
-      flex: 1;
-      padding: 14px 16px;
-      background: none;
-      border: none;
+      flex: 1; padding: 14px 16px;
+      background: none; border: none;
       border-bottom: 3px solid transparent;
       margin-bottom: -2px;
-      font-size: 15px;
-      font-weight: 600;
+      font-size: 15px; font-weight: 600;
       font-family: "Noto Sans JP", sans-serif;
-      color: var(--text-sub);
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
+      color: var(--muted); cursor: pointer;
+      transition: all 0.2s; text-align: center;
     }
-    .tab-btn:hover { color: var(--text); background: rgba(26,115,232,0.08); }
-    .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
-    }
-    .tab-content {
-      display: none;
-      padding: 32px 0 60px;
-    }
+    .tab-btn:hover { color: var(--text); background: rgba(0,200,150,0.05); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; padding: 0 0 32px; }
     .tab-content.active { display: block; }
 
-    /* ヒーロー（タブ内） */
-    .tab-hero {
-      text-align: center;
-    }
-    .tab-hero h2 {
-      font-size: clamp(22px, 4vw, 30px);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      line-height: 1.4;
-      margin-bottom: 12px;
-      color: var(--text);
-    }
-    .tab-hero .sub {
-      font-size: 14px;
-      color: var(--text-sub);
-      line-height: 1.8;
-      max-width: 480px;
-      margin: 0 auto 28px;
-    }
-    .tab-hero .sub strong {
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    /* 入力フォーム */
+    /* ===== 入力フォーム ===== */
     .form-wrap {
-      display: flex;
-      gap: 8px;
-      max-width: 520px;
-      width: 100%;
-      margin: 0 auto;
+      display: flex; gap: 8px;
+      max-width: 540px; width: 100%; margin: 0 auto;
     }
     .url-input {
-      flex: 1;
-      padding: 14px 18px;
+      flex: 1; padding: 14px 18px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 15px;
       font-family: "Noto Sans JP", sans-serif;
       background: var(--surface);
@@ -195,72 +147,239 @@
     }
     .url-input:focus {
       outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
-    .url-input::placeholder { color: #9AA0A6; }
+    .url-input::placeholder { color: var(--muted); }
     .submit-btn {
-      padding: 14px 24px;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
+      padding: 14px 28px;
+      background: var(--accent);
+      color: #0A0F1E;
+      border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700;
       font-family: "Noto Sans JP", sans-serif;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.2s;
+      cursor: pointer; white-space: nowrap;
+      transition: all 0.2s;
     }
-    .submit-btn:hover { background: #1557B0; opacity: 0.85; transform: translateY(-1px); }
-    .submit-btn:active { background: #174EA6; }
-    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .submit-btn.gbp-btn {
-      background: var(--secondary);
+    .submit-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px var(--accent-glow); }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .submit-btn.gbp-btn { background: var(--accent); }
+
+    .url-hint {
+      margin-top: 12px; font-size: 12px;
+      color: var(--muted); text-align: center;
     }
-    .submit-btn.gbp-btn:hover { background: #2D9249; }
-    .submit-btn.gbp-btn:active { background: #268B3E; }
+    .url-hint code {
+      background: var(--surface); padding: 2px 6px;
+      border-radius: 3px; font-size: 11px; color: var(--text-sub);
+    }
 
     @media (max-width: 540px) {
       .form-wrap { flex-direction: column; }
       .submit-btn { width: 100%; }
     }
 
-    /* URLヒント */
-    .url-hint {
-      margin-top: 12px;
-      font-size: 12px;
-      color: var(--text-sub);
-      text-align: center;
+    /* ===== LPセクション共通 ===== */
+    .lp-section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px;
     }
-    .url-hint code {
-      background: #F1F3F4;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-size: 11px;
+    .lp-section-title {
+      font-size: clamp(20px, 3.5vw, 28px);
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .lp-section-sub {
+      font-size: 14px; color: var(--text-sub);
+      text-align: center; margin-bottom: 40px;
     }
 
-    /* ローディング */
-    .loading-section {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 50vh;
+    /* ===== サンプルレポートカード ===== */
+    .sample-report {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .sample-badge {
+      position: absolute; top: -14px; right: 20px;
+      background: var(--accent); color: #0A0F1E;
+      font-size: 11px; font-weight: 700;
+      padding: 4px 14px; border-radius: 12px;
+    }
+    .sample-biz-name {
+      font-size: 18px; font-weight: 700; margin-bottom: 4px;
+    }
+    .sample-score-row {
+      display: flex; align-items: center; gap: 16px;
+      margin: 16px 0 24px;
+    }
+    .sample-score-circle {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      border: 4px solid var(--warn);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; flex-shrink: 0;
+    }
+    .sample-score-num { font-size: 28px; font-weight: 800; color: var(--warn); line-height: 1; }
+    .sample-score-label { font-size: 10px; color: var(--muted); }
+    .sample-grade {
+      display: inline-block;
+      background: var(--warn-bg); color: var(--warn);
+      font-size: 20px; font-weight: 800;
+      padding: 4px 16px; border-radius: 8px;
+    }
+    .sample-summary { font-size: 13px; color: var(--text-sub); }
+
+    /* プログレスバー（サンプル） */
+    .s-bar-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px; font-size: 13px;
+    }
+    .s-bar-label { width: 130px; flex-shrink: 0; font-weight: 600; color: var(--text-sub); }
+    .s-bar-wrap {
+      flex: 1; height: 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px; overflow: hidden;
+    }
+    .s-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+    .s-bar-score { width: 40px; text-align: right; font-weight: 700; font-size: 13px; }
+    .s-bar-emoji { width: 20px; text-align: center; font-size: 14px; }
+
+    /* サンプルアクション */
+    .sample-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .sample-action {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; font-size: 13px;
+    }
+    .sample-action .emoji { flex-shrink: 0; }
+
+    /* ===== 90日プランサンプル ===== */
+    .plan-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .plan-card-sample {
+      border-radius: 14px;
+      padding: 24px;
+      border: 1px solid var(--border);
+    }
+    .plan-card-sample.green { background: linear-gradient(135deg, rgba(0,200,150,0.1), rgba(0,200,150,0.03)); border-color: rgba(0,200,150,0.3); }
+    .plan-card-sample.blue { background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.03)); border-color: rgba(59,130,246,0.3); }
+    .plan-card-sample.purple { background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(168,85,247,0.03)); border-color: rgba(168,85,247,0.3); }
+    .plan-card-sample h4 {
+      font-size: 15px; font-weight: 700; margin-bottom: 12px;
+    }
+    .plan-card-sample.green h4 { color: #00C896; }
+    .plan-card-sample.blue h4 { color: #3B82F6; }
+    .plan-card-sample.purple h4 { color: #A855F7; }
+    .plan-card-sample ul {
+      list-style: none; padding: 0;
+    }
+    .plan-card-sample li {
+      font-size: 13px; color: var(--text-sub);
+      padding: 3px 0; display: flex; align-items: center; gap: 6px;
+    }
+    .plan-card-sample li::before {
+      content: ''; width: 6px; height: 6px;
+      border-radius: 50%; flex-shrink: 0;
+    }
+    .plan-card-sample.green li::before { background: #00C896; }
+    .plan-card-sample.blue li::before { background: #3B82F6; }
+    .plan-card-sample.purple li::before { background: #A855F7; }
+
+    .quick-win-sample {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .quick-win-sample h4 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+    .qw-check {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: var(--text-sub); padding: 4px 0;
+    }
+    .qw-check .box {
+      width: 18px; height: 18px;
+      border: 2px solid var(--accent);
+      border-radius: 4px; flex-shrink: 0;
+    }
+
+    /* ===== AIチャットプレビュー ===== */
+    .chat-preview {
+      max-width: 480px;
+      margin: 0 auto;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .chat-preview-header {
+      background: var(--accent);
+      color: #0A0F1E;
+      padding: 12px 16px;
+      font-size: 14px; font-weight: 700;
+    }
+    .chat-preview-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-bubble {
+      max-width: 80%; padding: 10px 14px;
+      border-radius: 12px; font-size: 13px; line-height: 1.6;
+    }
+    .chat-bubble.user {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #0A0F1E;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-bubble.ai {
+      align-self: flex-start;
+      background: var(--surface);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+    .chat-preview-caption {
+      text-align: center; font-size: 13px;
+      color: var(--muted); margin-top: 16px;
+    }
+
+    /* ===== 特徴カード ===== */
+    .feature-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+    .feat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 24px;
       text-align: center;
-      padding: 40px 24px;
+      transition: border-color 0.3s;
+    }
+    .feat-card:hover { border-color: var(--accent); }
+    .feat-card .feat-icon { font-size: 36px; margin-bottom: 12px; }
+    .feat-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feat-card p { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+
+    /* ===== ローディング ===== */
+    .loading-section {
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 50vh;
+      text-align: center; padding: 40px 24px;
     }
     .loading-section.active { display: flex; }
-    .loading-step {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-    .loading-sub {
-      font-size: 13px;
-      color: var(--text-sub);
-    }
+    .loading-step { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .loading-sub { font-size: 13px; color: var(--text-sub); }
     @keyframes stepFade {
       0% { opacity: 0; transform: translateY(6px); }
       15% { opacity: 1; transform: translateY(0); }
@@ -269,188 +388,82 @@
     }
     .step-animate { animation: stepFade 1.2s ease-in-out forwards; }
 
-    /* エラー */
-    .error-section {
-      display: none;
-      max-width: 560px;
-      margin: 80px auto;
-      padding: 0 24px;
-    }
+    /* ===== エラー ===== */
+    .error-section { display: none; max-width: 560px; margin: 80px auto; padding: 0 24px; }
     .error-section.active { display: block; }
     .error-card {
-      background: var(--bad-bg);
-      border: 1px solid #F5C6CB;
-      border-radius: 10px;
-      padding: 24px;
+      background: var(--bad-bg); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 10px; padding: 24px;
     }
     .error-card .title { font-weight: 700; color: var(--bad); margin-bottom: 8px; }
-    .error-card .msg { font-size: 14px; color: #C5221F; line-height: 1.7; }
+    .error-card .msg { font-size: 14px; color: #FCA5A5; line-height: 1.7; }
     .error-card .back-btn {
-      margin-top: 16px;
-      padding: 8px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-sub);
-      cursor: pointer;
+      margin-top: 16px; padding: 8px 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; font-size: 13px; font-weight: 600;
+      color: var(--text-sub); cursor: pointer;
       font-family: "Noto Sans JP", sans-serif;
     }
 
-    /* 結果 */
+    /* ===== 結果セクション ===== */
     .result-section {
-      display: none;
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 48px 24px 80px;
+      display: none; max-width: 720px;
+      margin: 0 auto; padding: 48px 24px 80px;
     }
     .result-section.active { display: block; }
 
-    /* 結果ヘッダー */
     .result-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
     }
-    .result-header .site-url {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .result-header .date {
-      font-size: 12px;
-      color: var(--text-sub);
-    }
+    .result-header .site-url { font-size: 15px; font-weight: 600; color: var(--text); }
+    .result-header .date { font-size: 12px; color: var(--text-sub); }
     .result-type-badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 4px;
-      flex-shrink: 0;
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 4px; flex-shrink: 0;
     }
-    .badge-web { background: var(--primary-light); color: var(--primary); }
-    .badge-gbp { background: var(--secondary-light); color: var(--secondary); }
+    .badge-web { background: rgba(59,130,246,0.15); color: #60A5FA; }
+    .badge-gbp { background: var(--accent-light); color: var(--accent); }
 
-    /* GBPニュース（結果内） */
     .gbp-news-card {
-      background: linear-gradient(135deg, #E8F0FE 0%, #E6F4EA 100%);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px 20px;
-      margin-bottom: 24px;
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--text);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;
+      font-size: 13px; line-height: 1.7;
     }
-    .gbp-news-card .news-title {
-      font-weight: 700;
-      font-size: 14px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .gbp-news-card .news-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
 
-    /* 総合スコアカード（円形ゲージ） */
+    /* 総合スコアカード */
     .score-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 36px;
-      text-align: center;
-      box-shadow: var(--shadow);
-      margin-bottom: 28px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 36px; text-align: center;
+      box-shadow: var(--shadow); margin-bottom: 28px;
     }
-    .score-card .label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-sub);
-      margin-bottom: 16px;
-    }
-    .score-gauge {
-      position: relative;
-      width: 160px;
-      height: 160px;
-      margin: 0 auto 16px;
-    }
-    .score-gauge svg {
-      width: 160px;
-      height: 160px;
-      transform: rotate(-90deg);
-    }
-    .score-gauge .gauge-bg {
-      fill: none;
-      stroke: #F1F3F4;
-      stroke-width: 10;
-    }
-    .score-gauge .gauge-fill {
-      fill: none;
-      stroke: var(--primary);
-      stroke-width: 10;
-      stroke-linecap: round;
-      stroke-dasharray: 408;
-      stroke-dashoffset: 408;
-      transition: stroke-dashoffset 1.2s ease-out;
-    }
-    .score-gauge .gauge-text {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .score-gauge .score-big {
-      font-size: 48px;
-      font-weight: 800;
-      line-height: 1;
-      letter-spacing: -0.04em;
-      color: var(--primary);
-    }
-    .score-gauge .score-max {
-      font-size: 14px;
-      font-weight: 500;
-      color: #9AA0A6;
-      display: block;
-      margin-top: 4px;
-    }
+    .score-card .label { font-size: 13px; font-weight: 600; color: var(--text-sub); margin-bottom: 16px; }
+    .score-gauge { position: relative; width: 160px; height: 160px; margin: 0 auto 16px; }
+    .score-gauge svg { width: 160px; height: 160px; transform: rotate(-90deg); }
+    .score-gauge .gauge-bg { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 10; }
+    .score-gauge .gauge-fill { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1.2s ease-out; }
+    .score-gauge .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+    .score-gauge .score-big { font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--accent); }
+    .score-gauge .score-max { font-size: 14px; font-weight: 500; color: var(--muted); display: block; margin-top: 4px; }
     .grade-badge {
-      display: inline-block;
-      padding: 4px 16px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 700;
-      background: var(--primary-light);
-      color: var(--primary);
+      display: inline-block; padding: 4px 16px; border-radius: 6px;
+      font-size: 14px; font-weight: 700;
+      background: var(--accent-light); color: var(--accent);
     }
     .score-card .summary-text {
-      margin-top: 16px;
-      font-size: 14px;
-      color: var(--text-sub);
-      line-height: 1.8;
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
+      margin-top: 16px; font-size: 14px; color: var(--text-sub);
+      line-height: 1.8; max-width: 480px; margin-left: auto; margin-right: auto;
     }
 
-    /* セパレータ */
     .sep { height: 1px; background: var(--border); margin: 28px 0; }
-
-    /* セクション見出し */
-    .section-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 16px;
-    }
+    .section-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
 
     /* 指標バー */
     .metrics-grid { display: flex; flex-direction: column; gap: 14px; }
     .metric-row { display: flex; align-items: center; gap: 10px; }
     .metric-icon { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
-    .metric-name { font-size: 13px; font-weight: 600; color: var(--text); width: 150px; flex-shrink: 0; }
-    .metric-bar-wrap { flex: 1; height: 8px; background: #F1F3F4; border-radius: 4px; overflow: hidden; }
+    .metric-name { font-size: 13px; font-weight: 600; color: var(--text-sub); width: 150px; flex-shrink: 0; }
+    .metric-bar-wrap { flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
     .metric-bar-fill { height: 100%; border-radius: 4px; width: 0%; transition: width 1s ease; }
     .metric-score { font-size: 14px; font-weight: 700; width: 32px; text-align: right; flex-shrink: 0; }
     .metric-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
@@ -458,91 +471,29 @@
     .badge-warn { background: var(--warn-bg); color: var(--warn); }
     .badge-bad { background: var(--bad-bg); color: var(--bad); }
 
-    @media (max-width: 540px) {
-      .metric-name { width: 100px; font-size: 12px; }
-    }
-
     /* 詳細カード */
     .detail-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: var(--shadow);
-      margin-bottom: 10px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 20px;
+      box-shadow: var(--shadow); margin-bottom: 10px;
     }
-    .detail-card .card-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .detail-card .card-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 700;
-    }
-    .detail-card .card-score {
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-    .detail-card .card-bar-wrap {
-      height: 5px;
-      background: #F1F3F4;
-      border-radius: 3px;
-      overflow: hidden;
-      margin-bottom: 12px;
-    }
-    .detail-card .card-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      width: 0%;
-      transition: width 1s ease;
-    }
-    .detail-card .card-detail {
-      font-size: 13px;
-      color: var(--text-sub);
-      line-height: 1.8;
-      margin-bottom: 10px;
-    }
+    .detail-card .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .detail-card .card-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+    .detail-card .card-score { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .detail-card .card-bar-wrap { height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+    .detail-card .card-bar-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 1s ease; }
+    .detail-card .card-detail { font-size: 13px; color: var(--text-sub); line-height: 1.8; margin-bottom: 10px; }
     .detail-card .recs { list-style: none; padding: 0; }
-    .detail-card .recs li {
-      font-size: 13px;
-      color: var(--text-sub);
-      padding: 3px 0;
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-    }
-    .detail-card .recs li::before {
-      content: "✓";
-      color: var(--primary);
-      font-weight: 700;
-      flex-shrink: 0;
-    }
+    .detail-card .recs li { font-size: 13px; color: var(--text-sub); padding: 3px 0; display: flex; align-items: flex-start; gap: 8px; }
+    .detail-card .recs li::before { content: "✓"; color: var(--accent); font-weight: 700; flex-shrink: 0; }
 
     /* アクションアイテム */
     .action-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 12px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 8px;
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px;
     }
-    .action-priority {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 4px;
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
+    .action-priority { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px; flex-shrink: 0; white-space: nowrap; }
     .p-high { background: var(--bad-bg); color: var(--bad); }
     .p-medium { background: var(--warn-bg); color: var(--warn); }
     .p-low { background: var(--good-bg); color: var(--good); }
@@ -550,381 +501,257 @@
 
     /* 実践ガイド */
     .practical-guide {
-      background: #F1F3F4;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 20px; margin-bottom: 10px;
     }
     .practical-guide .guide-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
     .practical-guide .guide-block { margin-bottom: 18px; }
     .practical-guide .guide-block:last-child { margin-bottom: 0; }
     .practical-guide .guide-block-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
     .practical-guide pre {
-      background: #202124;
-      color: #E8EAED;
-      padding: 16px;
-      border-radius: 8px;
+      background: #000; color: #E8EAED;
+      padding: 16px; border-radius: 8px;
       font-family: "SF Mono", "Fira Code", monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-      position: relative;
+      font-size: 13px; line-height: 1.6;
+      overflow-x: auto; white-space: pre-wrap;
+      word-break: break-all; position: relative;
     }
     .copy-code-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      padding: 4px 10px;
-      background: rgba(255,255,255,0.15);
-      color: #E8EAED;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: "Noto Sans JP", sans-serif;
+      position: absolute; top: 8px; right: 8px;
+      padding: 4px 10px; background: rgba(255,255,255,0.15);
+      color: #E8EAED; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px; font-size: 11px; font-weight: 600;
+      cursor: pointer; font-family: "Noto Sans JP", sans-serif;
     }
     .copy-code-btn:hover { background: rgba(255,255,255,0.25); }
     .practical-guide .faq-list { list-style: none; padding: 0; }
-    .practical-guide .faq-list li {
-      font-size: 13px;
-      color: var(--text);
-      padding: 5px 0;
-      line-height: 1.6;
-    }
-    .practical-guide .faq-list li::before {
-      content: "・";
-      color: var(--primary);
-      font-weight: 700;
-    }
+    .practical-guide .faq-list li { font-size: 13px; color: var(--text); padding: 5px 0; line-height: 1.6; }
+    .practical-guide .faq-list li::before { content: "・"; color: var(--accent); font-weight: 700; }
     .quick-win-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
     }
-    .quick-win-item .qw-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
+    .quick-win-item .qw-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .quick-win-item .qw-title { font-size: 13px; font-weight: 700; }
     .quick-win-item .qw-impact { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
     .quick-win-item ol { padding-left: 20px; margin: 0; }
     .quick-win-item ol li { font-size: 12px; color: var(--text-sub); line-height: 1.7; }
-
-    /* GBP投稿サンプル・返信テンプレート */
     .guide-text-block {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px 16px;
-      font-size: 13px;
-      line-height: 1.8;
-      color: var(--text);
-      white-space: pre-wrap;
-      position: relative;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px 16px; font-size: 13px;
+      line-height: 1.8; color: var(--text); white-space: pre-wrap; position: relative;
     }
 
     /* アクションボタン群 */
-    .action-btns {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 28px;
-    }
+    .action-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 28px; }
     .action-btns button {
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: "Noto Sans JP", sans-serif;
-      cursor: pointer;
-      transition: background 0.2s;
+      padding: 10px 20px; border-radius: 8px; font-size: 13px;
+      font-weight: 600; font-family: "Noto Sans JP", sans-serif;
+      cursor: pointer; transition: all 0.2s;
     }
-    .btn-copy { background: var(--primary); color: #fff; border: none; }
-    .btn-copy:hover { background: #1557B0; }
+    .btn-copy { background: var(--accent); color: #0A0F1E; border: none; }
+    .btn-copy:hover { opacity: 0.85; }
     .btn-retry { background: var(--surface); color: var(--text-sub); border: 1px solid var(--border); }
-    .btn-retry:hover { background: #F1F3F4; }
+    .btn-retry:hover { background: var(--bg2); }
 
-    /* フェードアップ */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .fade-up { animation: fadeUp 0.5s ease-out forwards; opacity: 0; }
-
-    .hidden { display: none !important; }
-
-    /* フッター */
-    .site-footer {
-      text-align: center;
-      padding: 24px;
-      font-size: 12px;
-      color: var(--text-sub);
-      border-top: 1px solid var(--border);
-      margin-top: 40px;
-    }
-
-    /* ==========================================
-       🖥️ PC対応 (min-width: 769px)
-       ========================================== */
-    @media (min-width: 769px) {
-      .tab-container { max-width: 900px; padding: 0 20px; }
-      .form-wrap { max-width: 700px; }
-      .url-input { font-size: 16px; }
-      .submit-btn { white-space: nowrap; min-width: 120px; }
-      .result-section { max-width: 900px; padding: 48px 20px 80px; }
-      #detailCards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-      #detailCards .detail-card { margin-bottom: 0; }
-    }
-
-    /* ==========================================
-       📱 モバイル完全対応 (max-width: 768px)
-       ========================================== */
-    @media (max-width: 768px) {
-      /* ヘッダー */
-      .site-header { padding: 10px 16px; }
-      .logo { font-size: 15px; }
-
-      /* ニュースバナー */
-      .news-banner {
-        flex-wrap: wrap;
-        font-size: 11px;
-        padding: 8px 12px;
-        gap: 4px;
-      }
-
-      /* タブ */
-      .tab-container { padding: 0 12px; }
-      .tab-btn {
-        font-size: 13px;
-        padding: 10px 14px;
-      }
-      .tab-content { padding: 24px 0 40px; }
-
-      /* ヒーロー */
-      .tab-hero .sub { font-size: 13px; }
-
-      /* フォーム */
-      .form-wrap { flex-direction: column; }
-      .url-input { font-size: 16px; padding: 12px 14px; }
-      .submit-btn {
-        width: 100%;
-        padding: 14px;
-        font-size: 15px;
-        border-radius: 12px;
-        min-height: 48px;
-      }
-
-      /* 結果セクション */
-      .result-section { padding: 24px 12px 60px; }
-
-      /* 結果ヘッダー */
-      .result-header {
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .result-header .site-url { font-size: 13px; }
-
-      /* スコアカード */
-      .score-card { padding: 24px 16px; }
-      .score-gauge { width: 120px; height: 120px; }
-      .score-gauge svg { width: 120px; height: 120px; }
-      .score-gauge .score-big { font-size: 36px; }
-      .score-card .summary-text { font-size: 13px; }
-
-      /* 指標バー */
-      .metric-row { flex-wrap: wrap; gap: 6px; }
-      .metric-name { width: 90px; font-size: 12px; }
-      .metric-icon { font-size: 16px; width: 24px; }
-
-      /* 詳細カード */
-      .detail-card { padding: 16px; }
-      .detail-card .card-title { font-size: 13px; }
-      .detail-card .card-detail { font-size: 12px; }
-      .detail-card .recs li { font-size: 12px; }
-
-      /* アクションアイテム */
-      .action-item { padding: 10px 12px; gap: 10px; }
-      .action-text { font-size: 12px; }
-
-      /* 実践ガイド */
-      .practical-guide { padding: 16px; }
-      .practical-guide pre { font-size: 11px; padding: 12px; }
-
-      /* クイックウィン */
-      .quick-win-item { padding: 14px; }
-      .quick-win-item ol li { font-size: 12px; }
-
-      /* 投稿サンプル・返信テンプレート */
-      .guide-text-block { font-size: 13px; padding: 12px; }
-
-      /* GBPニュース */
-      .gbp-news-card { padding: 12px 16px; font-size: 12px; }
-
-      /* アクションボタン群 */
-      .action-btns { flex-direction: column; }
-      .action-btns button { width: 100%; min-height: 48px; }
-
-      /* エラー */
-      .error-section { margin: 40px auto; padding: 0 12px; }
-
-      /* フッター */
-      .site-footer { padding: 16px 12px; }
-    }
-
-    /* ==========================================
-       📱 極小スマホ対応 (max-width: 390px)
-       ========================================== */
-    @media (max-width: 390px) {
-      .logo { font-size: 13px; }
-      .tab-btn { font-size: 11px; padding: 8px 10px; }
-      .score-gauge { width: 100px; height: 100px; }
-      .score-gauge svg { width: 100px; height: 100px; }
-      .score-gauge .score-big { font-size: 30px; }
-      .detail-card { padding: 12px; }
-      .action-item { padding: 8px 10px; }
-      .practical-guide { padding: 12px; }
-    }
-
-    /* 動画生成セクション */
+    /* 動画セクション */
     .video-section { margin-top: 24px; }
-    .video-card { background: #fff; border: 2px solid #1A73E8; border-radius: 16px; padding: 24px; }
+    .video-card { background: var(--bg2); border: 2px solid var(--accent); border-radius: 16px; padding: 24px; }
     .video-card-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
     .video-icon { font-size: 36px; flex-shrink: 0; }
-    .video-title { font-size: 18px; font-weight: 700; color: #1A73E8; margin-bottom: 4px; }
-    .video-subtitle { font-size: 14px; color: #5F6368; }
-    .video-start-btn { width: 100%; padding: 16px; background: #1A73E8; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+    .video-title { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .video-subtitle { font-size: 14px; color: var(--text-sub); }
+    .video-start-btn { width: 100%; padding: 16px; background: var(--accent); color: #0A0F1E; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .2s; font-family: "Noto Sans JP", sans-serif; }
     .video-start-btn:hover { opacity: 0.85; }
-    .video-start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .progress-bar-wrap { background: #F1F3F4; border-radius: 8px; height: 12px; margin: 16px 0 8px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #1A73E8, #34A853); border-radius: 8px; transition: width .5s ease; }
-    .video-status-text { font-size: 13px; color: #5F6368; text-align: center; }
-    .video-done-msg { font-size: 16px; font-weight: 700; color: #34A853; margin: 16px 0 12px; text-align: center; }
-    .video-download-btn { display: block; text-align: center; background: #34A853; color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    .video-start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .progress-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 8px; height: 12px; margin: 16px 0 8px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #3B82F6); border-radius: 8px; transition: width .5s ease; }
+    .video-status-text { font-size: 13px; color: var(--text-sub); text-align: center; }
+    .video-done-msg { font-size: 16px; font-weight: 700; color: var(--accent); margin: 16px 0 12px; text-align: center; }
+    .video-download-btn { display: block; text-align: center; background: var(--accent); color: #0A0F1E; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 700; margin-bottom: 16px; }
     .video-download-btn:hover { opacity: 0.85; }
-    .video-tips { background: #FFF8E1; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #5F6368; }
-    .video-error-msg { background: #FCE8E6; color: #EA4335; padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; }
+    .video-tips { background: var(--surface); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--text-sub); }
+    .video-error-msg { background: var(--bad-bg); color: var(--bad); padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; }
 
-    /* ===== 新機能ボタンエリア ===== */
+    /* 新機能ボタンエリア */
     .new-features-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
     .feature-btn {
       flex: 1; min-width: 200px; padding: 14px 20px; border: 2px solid var(--border);
       border-radius: 12px; background: var(--surface); cursor: pointer;
       font-size: 14px; font-weight: 700; color: var(--text);
       display: flex; align-items: center; gap: 8px; transition: all .2s;
+      font-family: "Noto Sans JP", sans-serif;
     }
-    .feature-btn:hover { border-color: var(--primary); background: var(--primary-light); }
-    .feature-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .feature-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+    .feature-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .feature-btn .btn-icon { font-size: 20px; }
 
-    /* ===== 90日アクションプラン ===== */
+    /* 90日アクションプラン */
     .action-plan-section { margin-top: 24px; }
-    .plan-card { background: var(--surface); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .plan-card { background: var(--bg2); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
     .plan-title { font-size: 18px; font-weight: 800; margin-bottom: 16px; color: var(--text); }
-    .plan-quick-wins { background: #FFF8E1; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
-    .plan-quick-wins h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #F9A825; }
+    .plan-quick-wins { background: rgba(245,158,11,0.1); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .plan-quick-wins h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--warn); }
     .plan-quick-wins label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; cursor: pointer; }
-    .plan-quick-wins input[type="checkbox"] { width: 16px; height: 16px; accent-color: #F9A825; }
-    .plan-kpis { background: var(--primary-light); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
-    .plan-kpis h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--primary); }
-    .plan-kpis li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 20px; }
+    .plan-quick-wins input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--warn); }
+    .plan-kpis { background: var(--accent-light); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .plan-kpis h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+    .plan-kpis li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 20px; color: var(--text-sub); }
     .plan-timeline { display: flex; flex-direction: column; gap: 0; }
     .plan-week {
-      border-left: 4px solid #ccc; padding: 12px 16px 12px 20px;
+      border-left: 4px solid var(--border); padding: 12px 16px 12px 20px;
       position: relative; cursor: pointer; transition: background .2s;
     }
-    .plan-week:hover { background: #F8F9FA; }
+    .plan-week:hover { background: var(--surface); }
     .plan-week::before {
       content: ''; position: absolute; left: -8px; top: 18px;
-      width: 12px; height: 12px; border-radius: 50%; background: #ccc;
+      width: 12px; height: 12px; border-radius: 50%; background: var(--border);
     }
-    .plan-week.phase-green { border-left-color: #34A853; }
-    .plan-week.phase-green::before { background: #34A853; }
-    .plan-week.phase-blue { border-left-color: #1A73E8; }
-    .plan-week.phase-blue::before { background: #1A73E8; }
-    .plan-week.phase-purple { border-left-color: #9C27B0; }
-    .plan-week.phase-purple::before { background: #9C27B0; }
+    .plan-week.phase-green { border-left-color: #00C896; }
+    .plan-week.phase-green::before { background: #00C896; }
+    .plan-week.phase-blue { border-left-color: #3B82F6; }
+    .plan-week.phase-blue::before { background: #3B82F6; }
+    .plan-week.phase-purple { border-left-color: #A855F7; }
+    .plan-week.phase-purple::before { background: #A855F7; }
     .plan-week-header { display: flex; align-items: center; gap: 10px; }
     .plan-week-label { font-size: 14px; font-weight: 700; }
-    .plan-week-theme { font-size: 12px; color: var(--text-sub); background: #F1F3F4; padding: 2px 8px; border-radius: 4px; }
+    .plan-week-theme { font-size: 12px; color: var(--text-sub); background: var(--surface); padding: 2px 8px; border-radius: 4px; }
     .plan-week-tasks { margin-top: 8px; display: none; }
     .plan-week.open .plan-week-tasks { display: block; }
-    .plan-week-tasks li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 16px; color: var(--text); }
+    .plan-week-tasks li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 16px; color: var(--text-sub); }
 
-    /* ===== 競合分析 ===== */
+    /* 競合分析 */
     .competitor-section { margin-top: 24px; }
-    .competitor-card { background: var(--surface); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .competitor-card { background: var(--bg2); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); }
     .competitor-title { font-size: 18px; font-weight: 800; margin-bottom: 16px; color: var(--text); }
     .competitor-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .competitor-table th { background: #F1F3F4; padding: 10px 12px; text-align: left; font-weight: 700; font-size: 12px; color: var(--text-sub); }
+    .competitor-table th { background: var(--surface); padding: 10px 12px; text-align: left; font-weight: 700; font-size: 12px; color: var(--text-sub); }
     .competitor-table td { padding: 10px 12px; border-top: 1px solid var(--border); }
-    .competitor-table tr.highlight { background: var(--primary-light); }
-    .competitor-table tr.highlight td { font-weight: 700; color: var(--primary); }
-    .comp-bar-wrap { background: #F1F3F4; border-radius: 4px; height: 8px; width: 80px; display: inline-block; vertical-align: middle; margin-left: 6px; }
+    .competitor-table tr.highlight { background: var(--accent-light); }
+    .competitor-table tr.highlight td { font-weight: 700; color: var(--accent); }
+    .comp-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 8px; width: 80px; display: inline-block; vertical-align: middle; margin-left: 6px; }
     .comp-bar-fill { height: 100%; border-radius: 4px; transition: width .5s; }
-    .competitor-advice { margin-top: 16px; padding: 16px; background: #F8F9FA; border-radius: 12px; }
+    .competitor-advice { margin-top: 16px; padding: 16px; background: var(--surface); border-radius: 12px; }
     .competitor-advice h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-    .competitor-advice li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 20px; }
+    .competitor-advice li { font-size: 13px; padding: 3px 0; list-style: disc; margin-left: 20px; color: var(--text-sub); }
 
-    /* ===== AIチャット ===== */
+    /* AIチャット */
     .chat-fab {
       position: fixed; bottom: 24px; right: 24px; z-index: 1000;
       width: 56px; height: 56px; border-radius: 50%;
-      background: var(--primary); color: #fff; border: none;
-      font-size: 24px; cursor: pointer; box-shadow: 0 4px 16px rgba(26,115,232,0.4);
-      display: flex; align-items: center; justify-content: center; transition: transform .2s;
+      background: var(--accent); color: #0A0F1E; border: none;
+      font-size: 24px; cursor: pointer;
+      box-shadow: 0 4px 16px var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .2s;
     }
     .chat-fab:hover { transform: scale(1.1); }
     .chat-fab.hidden { display: none; }
     .chat-panel {
       position: fixed; bottom: 90px; right: 24px; z-index: 1001;
-      width: 340px; height: 460px; background: var(--surface);
-      border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      width: 340px; height: 460px; background: var(--bg2);
+      border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
       display: none; flex-direction: column; overflow: hidden;
       border: 1px solid var(--border);
     }
     .chat-panel.open { display: flex; }
     .chat-header {
-      padding: 14px 16px; background: var(--primary); color: #fff;
+      padding: 14px 16px; background: var(--accent); color: #0A0F1E;
       display: flex; align-items: center; justify-content: space-between;
       font-size: 14px; font-weight: 700; flex-shrink: 0;
     }
-    .chat-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 0 4px; }
+    .chat-close { background: none; border: none; color: #0A0F1E; font-size: 20px; cursor: pointer; padding: 0 4px; }
     .chat-messages {
-      flex: 1; overflow-y: auto; padding: 12px; display: flex;
-      flex-direction: column; gap: 8px;
+      flex: 1; overflow-y: auto; padding: 12px;
+      display: flex; flex-direction: column; gap: 8px;
     }
     .chat-msg {
       max-width: 85%; padding: 10px 14px; border-radius: 12px;
       font-size: 13px; line-height: 1.6; word-break: break-word;
     }
-    .chat-msg.user { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
-    .chat-msg.assistant { align-self: flex-start; background: #F1F3F4; color: var(--text); border-bottom-left-radius: 4px; }
-    .chat-msg.loading { align-self: flex-start; background: #F1F3F4; color: var(--text-sub); font-style: italic; }
+    .chat-msg.user { align-self: flex-end; background: var(--accent); color: #0A0F1E; border-bottom-right-radius: 4px; }
+    .chat-msg.assistant { align-self: flex-start; background: var(--surface); color: var(--text); border-bottom-left-radius: 4px; }
+    .chat-msg.loading { align-self: flex-start; background: var(--surface); color: var(--muted); font-style: italic; }
     .chat-input-area {
-      display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+      display: flex; gap: 8px; padding: 12px;
+      border-top: 1px solid var(--border); flex-shrink: 0;
     }
     .chat-input {
       flex: 1; padding: 10px 14px; border: 1px solid var(--border);
       border-radius: 8px; font-size: 13px; outline: none; resize: none;
       font-family: "Noto Sans JP", sans-serif;
+      background: var(--surface); color: var(--text);
     }
-    .chat-input:focus { border-color: var(--primary); }
+    .chat-input:focus { border-color: var(--accent); }
     .chat-send {
-      background: var(--primary); color: #fff; border: none; border-radius: 8px;
-      padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+      background: var(--accent); color: #0A0F1E; border: none;
+      border-radius: 8px; padding: 10px 14px; font-size: 13px;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
     }
-    .chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+    .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.5s ease-out forwards; opacity: 0; }
+    .hidden { display: none !important; }
+
+    .site-footer {
+      text-align: center; padding: 24px;
+      font-size: 12px; color: var(--muted);
+      border-top: 1px solid var(--border); margin-top: 0;
+    }
+
+    /* ===== PC対応 ===== */
+    @media (min-width: 769px) {
+      .tab-container { max-width: 900px; padding: 0 20px; }
+      .form-wrap { max-width: 700px; }
+      .url-input { font-size: 16px; }
+      .submit-btn { white-space: nowrap; min-width: 140px; }
+      .result-section { max-width: 900px; padding: 48px 20px 80px; }
+      #detailCards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+      #detailCards .detail-card { margin-bottom: 0; }
+    }
+
+    /* ===== モバイル対応 ===== */
+    @media (max-width: 768px) {
+      .site-header { padding: 10px 16px; }
+      .site-header .logo { font-size: 18px; }
+      .hero { padding: 40px 16px 30px; }
+      .tab-container { padding: 0 12px; }
+      .tab-btn { font-size: 13px; padding: 10px 14px; }
+      .tab-content { padding: 0 0 24px; }
+      .url-input { font-size: 16px; padding: 12px 14px; }
+      .submit-btn { width: 100%; padding: 14px; font-size: 15px; border-radius: 12px; min-height: 48px; }
+      .lp-section { padding: 40px 16px; }
+      .sample-report { padding: 20px; }
+      .s-bar-label { width: 90px; font-size: 12px; }
+      .result-section { padding: 24px 12px 60px; }
+      .result-header { flex-wrap: wrap; gap: 8px; }
+      .score-card { padding: 24px 16px; }
+      .score-gauge { width: 120px; height: 120px; }
+      .score-gauge svg { width: 120px; height: 120px; }
+      .score-gauge .score-big { font-size: 36px; }
+      .metric-row { flex-wrap: wrap; gap: 6px; }
+      .metric-name { width: 90px; font-size: 12px; }
+      .detail-card { padding: 16px; }
+      .action-item { padding: 10px 12px; }
+      .practical-guide { padding: 16px; }
+      .action-btns { flex-direction: column; }
+      .action-btns button { width: 100%; min-height: 48px; }
+      .plan-cards { grid-template-columns: 1fr; }
+    }
     @media (max-width: 480px) {
       .chat-panel { width: calc(100vw - 32px); right: 16px; bottom: 80px; height: 400px; }
       .chat-fab { bottom: 16px; right: 16px; }
+    }
+    @media (max-width: 390px) {
+      .site-header .logo { font-size: 15px; }
+      .tab-btn { font-size: 11px; padding: 8px 10px; }
+      .score-gauge { width: 100px; height: 100px; }
+      .score-gauge svg { width: 100px; height: 100px; }
+      .score-gauge .score-big { font-size: 30px; }
     }
   </style>
 </head>
@@ -933,68 +760,205 @@
   <!-- ヘッダー -->
   <header class="site-header">
     <div class="logo">
-      <span class="logo-icon">🗺️</span>
-      <span><span class="blue">AI</span>検索<span class="green">GBP</span>改善君</span>
+      <span class="accent">ZETT-AI</span>
     </div>
     <span class="subtitle">Googleマップ × AI検索 最適化診断</span>
   </header>
 
-  <!-- GBP最新ニュースバナー -->
-  <div class="news-banner">
-    <span class="news-icon">🗺️</span>
-    <span class="news-date">2026/3/12</span>
-    <span class="news-text">
-      <strong>Google Maps 大型刷新</strong> — Gemini搭載「Ask Maps」とImmersive Navigationが米国でロールアウト開始。AI会話型マップへ進化。<strong>GBP最適化の重要性がさらに増しています。</strong>
-    </span>
-  </div>
-
-  <!-- メインコンテンツ（タブ付きフォーム） -->
+  <!-- メインコンテンツ -->
   <section id="mainSection">
-    <div class="tab-container">
-      <!-- タブ -->
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="web" onclick="switchTab('web')">🌐 Webサイト診断</button>
-        <button class="tab-btn" data-tab="gbp" onclick="switchTab('gbp')">📍 GBPマップ診断</button>
-      </div>
 
-      <!-- Webサイト診断タブ -->
-      <div id="tabWeb" class="tab-content active">
-        <div class="tab-hero">
-          <dotlottie-player
-            src="https://assets-v2.lottiefiles.com/a/e88e947e-117e-11ee-b32b-1f49352a17f5/h9q2N827xF.lottie"
-            background="transparent" speed="1" loop autoplay
-            style="width: 200px; height: 200px; margin: 0 auto 8px;"
-          ></dotlottie-player>
-          <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 20px; font-weight: 500;">AIのことならネコに聞け🐱</p>
-          <h2>あなたのサイトは<br>AIに見えていますか？</h2>
-          <p class="sub">
-            URLを入力するだけ。登録不要・完全無料で<br>
-            <strong>ChatGPT・Claude・Perplexity</strong>への最適化スコアを診断。
-          </p>
-          <form id="webForm" class="form-wrap">
-            <input type="text" id="webUrlInput" class="url-input" placeholder="https://example.com を入力..." autocomplete="url">
-            <button type="submit" id="webSubmitBtn" class="submit-btn">診断する →</button>
-          </form>
+    <!-- ヒーロー -->
+    <div class="hero">
+      <h1>「AIのことなら<span class="accent">ZETT-AI（絶対）</span>」</h1>
+      <p class="hero-sub">GoogleマップのURLを貼るだけ。<br>AIがあなたのお店の集客力を診断します。</p>
+      <span class="hero-badge">登録不要・無料・30秒で完了</span>
+
+      <div class="tab-container">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="web" onclick="switchTab('web')">🌐 Webサイト診断</button>
+          <button class="tab-btn" data-tab="gbp" onclick="switchTab('gbp')">📍 Googleマップ診断（GBP）</button>
         </div>
-      </div>
 
-      <!-- GBP診断タブ -->
-      <div id="tabGbp" class="tab-content">
-        <div class="tab-hero">
-          <div style="font-size: 80px; margin-bottom: 12px;">📍</div>
-          <h2>Googleマップで<br>お店は見つかっていますか？</h2>
-          <p class="sub">
-            GoogleマップのURLを貼るだけ。<br>
-            <strong>GBP（Googleビジネスプロフィール）</strong>の最適化状況を<br>AIが6つの視点で診断＆改善案を提示。
-          </p>
-          <form id="gbpForm" class="form-wrap">
-            <input type="text" id="gbpUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url">
-            <button type="submit" id="gbpSubmitBtn" class="submit-btn gbp-btn">診断する →</button>
-          </form>
-          <p class="url-hint">対応URL: <code>google.com/maps/place/...</code> <code>maps.google.com</code> <code>g.page</code></p>
+        <div id="tabWeb" class="tab-content active">
+          <div style="padding-top:24px;">
+            <form id="webForm" class="form-wrap">
+              <input type="text" id="webUrlInput" class="url-input" placeholder="https://example.com を入力..." autocomplete="url">
+              <button type="submit" id="webSubmitBtn" class="submit-btn">診断スタート</button>
+            </form>
+            <p class="url-hint">ChatGPT・Claude・Perplexity への最適化スコアを診断</p>
+          </div>
+        </div>
+
+        <div id="tabGbp" class="tab-content">
+          <div style="padding-top:24px;">
+            <form id="gbpForm" class="form-wrap">
+              <input type="text" id="gbpUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url">
+              <button type="submit" id="gbpSubmitBtn" class="submit-btn gbp-btn">診断スタート</button>
+            </form>
+            <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>g.page</code></p>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Section 2: サンプルレポートプレビュー -->
+    <div class="lp-section">
+      <p class="lp-section-title">📊 こんな診断レポートが出ます</p>
+      <p class="lp-section-sub">URLを入力するだけで、6つの視点からAIが自動診断</p>
+
+      <div class="sample-report">
+        <span class="sample-badge">← 実際の診断結果サンプル</span>
+        <p class="sample-biz-name">焼肉 炭火苑 新宿店</p>
+        <div class="sample-score-row">
+          <div class="sample-score-circle">
+            <span class="sample-score-num">62</span>
+            <span class="sample-score-label">/ 100</span>
+          </div>
+          <div>
+            <span class="sample-grade">C</span>
+            <p class="sample-summary" style="margin-top:8px;">改善の余地が大きく、適切な対策で大幅なスコアアップが見込めます。</p>
+          </div>
+        </div>
+
+        <!-- カテゴリバー -->
+        <div style="margin-bottom:20px;">
+          <div class="s-bar-row">
+            <span class="s-bar-label">プロフィール完成度</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:70%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">70</span>
+            <span class="s-bar-emoji">🟡</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">写真・動画</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:35%;background:var(--bad)"></div></div>
+            <span class="s-bar-score" style="color:var(--bad)">35</span>
+            <span class="s-bar-emoji">🔴</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">クチコミ管理</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:55%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">55</span>
+            <span class="s-bar-emoji">🟡</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">投稿活動</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:20%;background:var(--bad)"></div></div>
+            <span class="s-bar-score" style="color:var(--bad)">20</span>
+            <span class="s-bar-emoji">🔴</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">Q&A管理</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:15%;background:var(--bad)"></div></div>
+            <span class="s-bar-score" style="color:var(--bad)">15</span>
+            <span class="s-bar-emoji">🔴</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">ローカルSEO</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:65%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">65</span>
+            <span class="s-bar-emoji">🟡</span>
+          </div>
+        </div>
+
+        <!-- TOP3アクション -->
+        <div class="sample-actions">
+          <div class="sample-action">
+            <span class="emoji">🔴</span>
+            <span>写真を最低20枚追加してください（現在推定3枚）</span>
+          </div>
+          <div class="sample-action">
+            <span class="emoji">🔴</span>
+            <span>投稿を月2〜4回のペースで開始してください</span>
+          </div>
+          <div class="sample-action">
+            <span class="emoji">🟡</span>
+            <span>未返信のクチコミに48時間以内に返信してください</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: 90日アクションプランサンプル -->
+    <div class="lp-section" style="background:var(--bg2);max-width:100%;padding-left:0;padding-right:0;">
+      <div style="max-width:900px;margin:0 auto;padding:0 24px;">
+        <p class="lp-section-title">📅 90日アクションプランも自動生成</p>
+        <p class="lp-section-sub">診断結果から、あなたの店舗に合った具体的な改善ステップを自動作成</p>
+
+        <div class="plan-cards">
+          <div class="plan-card-sample green">
+            <h4>1〜4週目（基盤整備）</h4>
+            <ul>
+              <li>写真20枚撮影・アップロード</li>
+              <li>営業時間・説明文を完璧に更新</li>
+              <li>未返信クチコミ全件返信</li>
+            </ul>
+          </div>
+          <div class="plan-card-sample blue">
+            <h4>5〜8週目（集客強化）</h4>
+            <ul>
+              <li>GBP投稿を週1回ペースで開始</li>
+              <li>Q&Aを5問先行設置</li>
+              <li>写真を毎月5枚追加</li>
+            </ul>
+          </div>
+          <div class="plan-card-sample purple">
+            <h4>9〜12週目（最適化）</h4>
+            <ul>
+              <li>カテゴリ・属性の最適化</li>
+              <li>競合比較・差別化ポイント強化</li>
+              <li>Ask Maps（AI検索）対応コンテンツ整備</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="quick-win-sample">
+          <h4>✅ クイックウィン（今日できること）</h4>
+          <div class="qw-check"><span class="box"></span>Googleビジネスプロフィールにログインして営業時間を確認・更新</div>
+          <div class="qw-check"><span class="box"></span>店舗の外観・内観写真をスマホで5枚撮影してアップロード</div>
+          <div class="qw-check"><span class="box"></span>未返信のクチコミ1件に返信する</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: AIチャットプレビュー -->
+    <div class="lp-section">
+      <p class="lp-section-title">💬 診断後はAIに質問もできます</p>
+      <p class="lp-section-sub">診断結果をもとにAIが具体的なアドバイスをします</p>
+
+      <div class="chat-preview">
+        <div class="chat-preview-header">💬 GBP AIアシスタント</div>
+        <div class="chat-preview-body">
+          <div class="chat-bubble user">写真はどんなものを撮ればいいですか？</div>
+          <div class="chat-bubble ai">外観・内観・料理・スタッフの4種類を各5枚ずつ、合計20枚が目安です。明るい自然光で撮影し、解像度720px以上を推奨します。特に料理写真はGBPの表示で最も目を引くため、盛り付けにこだわった写真を優先してください。</div>
+        </div>
+      </div>
+      <p class="chat-preview-caption">診断完了後、チャットボタンから何でも質問できます</p>
+    </div>
+
+    <!-- Section 5: 特徴カード -->
+    <div class="lp-section" style="background:var(--bg2);max-width:100%;padding-left:0;padding-right:0;">
+      <div style="max-width:900px;margin:0 auto;padding:0 24px;">
+        <div class="feature-cards">
+          <div class="feat-card">
+            <div class="feat-icon">⚡</div>
+            <h3>30秒で診断完了</h3>
+            <p>登録不要・URLを貼るだけ。<br>面倒な設定は一切なし。</p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon">🤖</div>
+            <h3>AIが具体的に改善案を提示</h3>
+            <p>曖昧なアドバイスではなく、<br>今日から実行可能なアクション。</p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon">📈</div>
+            <h3>Ask Maps（AI検索）にも対応</h3>
+            <p>2026年夏のGoogle AI検索に<br>先手を打つ準備を。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ローディング -->
@@ -1019,7 +983,6 @@
 
   <!-- 結果 -->
   <section id="resultSection" class="result-section">
-    <!-- 結果ヘッダー -->
     <div class="result-header fade-up">
       <dotlottie-player id="successLottie"
         src="https://assets-v2.lottiefiles.com/a/9a7b99d6-1173-11ee-b889-cf912d791ac4/6QFhZg0Ewk.lottie"
@@ -1033,13 +996,11 @@
       <span id="resultTypeBadge" class="result-type-badge"></span>
     </div>
 
-    <!-- GBPニュース（GBP診断時のみ表示） -->
     <div id="gbpNewsCard" class="gbp-news-card" style="display:none;">
       <div class="news-title">🗺️ GBP最新動向</div>
       <p id="gbpNewsText"></p>
     </div>
 
-    <!-- 総合スコア（円形ゲージ） -->
     <div class="score-card fade-up" style="animation-delay: 0.1s;">
       <p class="label">総合スコア</p>
       <div class="score-gauge">
@@ -1058,7 +1019,6 @@
 
     <div class="sep"></div>
 
-    <!-- 評価指標 -->
     <div class="fade-up" style="animation-delay: 0.2s;">
       <p id="metricsTitle" class="section-title">評価指標</p>
       <div id="metricsGrid" class="metrics-grid"></div>
@@ -1066,7 +1026,6 @@
 
     <div class="sep"></div>
 
-    <!-- 詳細レポート -->
     <div class="fade-up" style="animation-delay: 0.3s;">
       <p class="section-title">詳細レポート</p>
       <div id="detailCards"></div>
@@ -1074,7 +1033,6 @@
 
     <div class="sep"></div>
 
-    <!-- 今すぐやること -->
     <div class="fade-up" style="animation-delay: 0.4s;">
       <p class="section-title">今すぐやること TOP3</p>
       <div id="topActions"></div>
@@ -1082,13 +1040,12 @@
 
     <div class="sep"></div>
 
-    <!-- 実践ガイド -->
     <div id="practicalGuideSection" class="fade-up" style="animation-delay: 0.5s; display: none;">
       <p class="section-title">🛠️ 実践ガイド（今日からできること）</p>
       <div id="practicalGuideContent"></div>
     </div>
 
-    <!-- 動画生成セクション（GBP診断結果の直後に追加） -->
+    <!-- 動画生成セクション -->
     <div id="video-section" class="video-section" style="display:none">
       <div class="video-card">
         <div class="video-card-header">
@@ -1099,52 +1056,34 @@
           </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button id="btn-normal" class="video-start-btn" onclick="startVideoGeneration(false)"
-            style="flex:1;background:#1A73E8">
-            🎬 ノーマル動画
-          </button>
-          <button id="btn-sparkle" class="video-start-btn" onclick="startVideoGeneration(true)"
-            style="flex:1;background:linear-gradient(135deg,#f093fb,#f5576c)">
-            ✨ キラキラ動画
-          </button>
+          <button id="btn-normal" class="video-start-btn" onclick="startVideoGeneration(false)" style="flex:1;background:var(--accent);color:#0A0F1E">🎬 ノーマル動画</button>
+          <button id="btn-sparkle" class="video-start-btn" onclick="startVideoGeneration(true)" style="flex:1;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff">✨ キラキラ動画</button>
         </div>
-
-        <!-- 進捗表示 -->
         <div id="video-progress" style="display:none">
           <div class="progress-bar-wrap">
             <div id="video-progress-bar" class="progress-bar-fill" style="width:0%"></div>
           </div>
           <div id="video-status-text" class="video-status-text">処理中...</div>
         </div>
-
-        <!-- 完成後 -->
         <div id="video-done" style="display:none">
           <div class="video-done-msg">✅ 動画が完成しました！</div>
-          <a id="video-download-link" class="video-download-btn" href="#" download>
-            ⬇️ 動画をダウンロード（MP4）
-          </a>
-          <div class="video-tips">
-            💡 <strong>使い方:</strong> ダウンロードしたMP4をGoogleビジネスプロフィールの「写真」タブ → 「動画」から投稿してください
-          </div>
+          <a id="video-download-link" class="video-download-btn" href="#" download>⬇️ 動画をダウンロード（MP4）</a>
+          <div class="video-tips">💡 <strong>使い方:</strong> ダウンロードしたMP4をGoogleビジネスプロフィールの「写真」タブ → 「動画」から投稿してください</div>
         </div>
-
-        <!-- エラー -->
         <div id="video-error" style="display:none" class="video-error-msg"></div>
-
-        <!-- 動画メール送信 -->
-        <div id="video-mail-section" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid #E8EAED">
-          <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:#202124">📧 お客様へ直接メール送信</div>
+        <div id="video-mail-section" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+          <div style="font-weight:700;font-size:14px;margin-bottom:12px">📧 お客様へ直接メール送信</div>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <input type="text" id="video-biz-name" placeholder="店舗名・会社名" style="padding:11px 14px;border:1px solid #E8EAED;border-radius:8px;font-size:14px">
-            <input type="email" id="video-email" placeholder="お客様のメールアドレス" style="padding:11px 14px;border:1px solid #E8EAED;border-radius:8px;font-size:14px">
-            <button onclick="sendVideoMail()" style="background:#34A853;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer" id="video-send-btn">送信する</button>
+            <input type="text" id="video-biz-name" placeholder="店舗名・会社名" style="padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface);color:var(--text)">
+            <input type="email" id="video-email" placeholder="お客様のメールアドレス" style="padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface);color:var(--text)">
+            <button onclick="sendVideoMail()" style="background:var(--accent);color:#0A0F1E;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif" id="video-send-btn">送信する</button>
           </div>
           <div id="video-mail-msg" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:13px"></div>
         </div>
       </div>
     </div>
 
-    <!-- 新機能ボタン（GBP診断後のみ表示） -->
+    <!-- 新機能ボタン -->
     <div id="new-features-area" style="display:none">
       <div class="new-features-btns">
         <button class="feature-btn" id="btn-action-plan" onclick="generateActionPlan()">
@@ -1154,8 +1093,6 @@
           <span class="btn-icon">🔍</span> 競合分析を実行
         </button>
       </div>
-
-      <!-- 90日アクションプラン表示エリア -->
       <div id="action-plan-area" class="action-plan-section" style="display:none">
         <div class="plan-card">
           <div class="plan-title">📅 90日アクションプラン</div>
@@ -1164,8 +1101,6 @@
           <div id="plan-timeline" class="plan-timeline"></div>
         </div>
       </div>
-
-      <!-- 競合分析表示エリア -->
       <div id="competitor-area" class="competitor-section" style="display:none">
         <div class="competitor-card">
           <div class="competitor-title">🔍 競合分析レポート</div>
@@ -1176,33 +1111,31 @@
       </div>
     </div>
 
-    <!-- GBP レポート共有エリア -->
-    <div id="gbp-report-actions" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid #E8EAED">
-      <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:#202124">📋 レポートを共有</div>
+    <!-- レポート共有エリア -->
+    <div id="gbp-report-actions" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px">📋 レポートを共有</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <button onclick="copyReportType('gbp')" style="background:#F1F3F4;color:#202124;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-copy-btn">📋 コピー</button>
+        <button onclick="copyReportType('gbp')" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-copy-btn">📋 コピー</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="email" id="gbp-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid #E8EAED;border-radius:8px;font-size:13px">
-        <button onclick="sendReportEmail('gbp')" style="background:#1A73E8;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-send-btn">📧 メールで送信</button>
+        <input type="email" id="gbp-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)">
+        <button onclick="sendReportEmail('gbp')" style="background:var(--accent);color:#0A0F1E;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="gbp-send-btn">📧 メールで送信</button>
       </div>
       <div id="gbp-report-msg" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:13px"></div>
     </div>
 
-    <!-- GEO レポート共有エリア -->
-    <div id="geo-report-actions" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid #E8EAED">
-      <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:#202124">📋 レポートを共有</div>
+    <div id="geo-report-actions" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px">📋 レポートを共有</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <button onclick="copyReportType('geo')" style="background:#F1F3F4;color:#202124;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-copy-btn">📋 コピー</button>
+        <button onclick="copyReportType('geo')" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-copy-btn">📋 コピー</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="email" id="geo-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid #E8EAED;border-radius:8px;font-size:13px">
-        <button onclick="sendReportEmail('geo')" style="background:#1A73E8;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-send-btn">📧 メールで送信</button>
+        <input type="email" id="geo-report-email" placeholder="送信先メールアドレス" style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)">
+        <button onclick="sendReportEmail('geo')" style="background:var(--accent);color:#0A0F1E;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer" id="geo-send-btn">📧 メールで送信</button>
       </div>
       <div id="geo-report-msg" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:13px"></div>
     </div>
 
-    <!-- ボタン群 -->
     <div class="action-btns fade-up" style="animation-delay: 0.6s;">
       <button onclick="copyReport()" id="copyBtn" class="btn-copy">レポートをコピー</button>
       <button onclick="backToForm()" class="btn-retry">もう一度診断する</button>
@@ -1210,22 +1143,22 @@
   </section>
 
   <footer class="site-footer">
-    AI検索GBP改善君 — Googleマップ × AI検索 最適化診断ツール
+    ZETT-AI — Googleマップ × AI検索 最適化診断ツール
   </footer>
 
-<!-- AIチャット: フローティングボタン + パネル -->
-<button id="chat-fab" class="chat-fab hidden" onclick="toggleChat()">💬</button>
-<div id="chat-panel" class="chat-panel">
-  <div class="chat-header">
-    <span>💬 GBP AIアシスタント</span>
-    <button class="chat-close" onclick="toggleChat()">&times;</button>
+  <!-- AIチャット -->
+  <button id="chat-fab" class="chat-fab hidden" onclick="toggleChat()">💬</button>
+  <div id="chat-panel" class="chat-panel">
+    <div class="chat-header">
+      <span>💬 GBP AIアシスタント</span>
+      <button class="chat-close" onclick="toggleChat()">&times;</button>
+    </div>
+    <div id="chat-messages" class="chat-messages"></div>
+    <div class="chat-input-area">
+      <input type="text" id="chat-input" class="chat-input" placeholder="GBPについて質問する..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+      <button class="chat-send" onclick="sendChatMessage()" id="chat-send-btn">送信</button>
+    </div>
   </div>
-  <div id="chat-messages" class="chat-messages"></div>
-  <div class="chat-input-area">
-    <input type="text" id="chat-input" class="chat-input" placeholder="GBPについて質問する..." onkeydown="if(event.key==='Enter')sendChatMessage()">
-    <button class="chat-send" onclick="sendChatMessage()" id="chat-send-btn">送信</button>
-  </div>
-</div>
 
 <script>
 // ===== Web診断用定義 =====
@@ -1253,9 +1186,8 @@ const GBP_CATEGORY_NAMES = {
 const GBP_CATEGORY_ORDER = ['profile_completeness', 'photos_videos', 'reviews_management', 'posts_activity', 'qa_section', 'local_seo'];
 
 let lastResult = null;
-let currentMode = 'web'; // 'web' or 'gbp'
+let currentMode = 'web';
 
-// ===== タブ切り替え =====
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -1263,7 +1195,6 @@ function switchTab(tab) {
   document.getElementById(tab === 'web' ? 'tabWeb' : 'tabGbp').classList.add('active');
 }
 
-// ===== スコアカラー =====
 function scoreColor(score) {
   if (score >= 80) return 'var(--good)';
   if (score >= 50) return 'var(--warn)';
@@ -1289,7 +1220,6 @@ function normalizeUrl(input) {
   return url;
 }
 
-// ===== Web診断フォーム =====
 document.getElementById('webForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const url = normalizeUrl(document.getElementById('webUrlInput').value);
@@ -1299,7 +1229,6 @@ document.getElementById('webForm').addEventListener('submit', async (e) => {
   await runAnalysis(url, '/api/analyze', 'web');
 });
 
-// ===== GBP診断フォーム =====
 document.getElementById('gbpForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const url = normalizeUrl(document.getElementById('gbpUrlInput').value);
@@ -1309,10 +1238,8 @@ document.getElementById('gbpForm').addEventListener('submit', async (e) => {
   await runAnalysis(url, '/api/analyze-gbp', 'gbp');
 });
 
-// ===== 分析実行（非同期ポーリング方式） =====
 async function runAnalysis(url, endpoint, mode) {
   showLoading(mode);
-
   const steps = mode === 'web' ? [
     { main: 'AIが分析中... (1/6)', detail: 'robots.txtを確認中...' },
     { main: 'AIが分析中... (2/6)', detail: 'llms.txtを解析中...' },
@@ -1328,13 +1255,11 @@ async function runAnalysis(url, endpoint, mode) {
     { main: 'AIが分析中... (5/6)', detail: 'ローカルSEOを評価中...' },
     { main: 'AIが分析中... (6/6)', detail: '改善レポートを生成中...' }
   ];
-
   let stepIndex = 0;
   const stepEl = document.getElementById('loadingStep');
   const detailEl = document.getElementById('loadingStepDetail');
   stepEl.textContent = steps[0].main;
   detailEl.textContent = steps[0].detail;
-
   const stepInterval = setInterval(() => {
     stepIndex++;
     if (stepIndex < steps.length) {
@@ -1345,29 +1270,17 @@ async function runAnalysis(url, endpoint, mode) {
       detailEl.classList.add('step-animate');
     }
   }, 1500);
-
   try {
-    // 1. ジョブを開始
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
     const data = await response.json();
-    if (data.error) {
-      clearInterval(stepInterval);
-      showError(data.error);
-      return;
-    }
-
-    // 2. ポーリングで結果待ち
+    if (data.error) { clearInterval(stepInterval); showError(data.error); return; }
     const result = await pollAnalyzeStatus(data.job_id);
     clearInterval(stepInterval);
-    if (result) {
-      lastResult = result;
-      lastResult._mode = mode;
-      showResults(result, mode);
-    }
+    if (result) { lastResult = result; lastResult._mode = mode; showResults(result, mode); }
   } catch (err) {
     clearInterval(stepInterval);
     showError('通信エラーが発生しました。もう一度お試しください。');
@@ -1383,9 +1296,7 @@ async function pollAnalyzeStatus(jobId, maxWait = 120000) {
       const data = await res.json();
       if (data.status === "done") return data.result;
       if (data.status === "error") { showError(data.error); return null; }
-    } catch (e) {
-      // ネットワークエラーは無視してリトライ
-    }
+    } catch (e) {}
   }
   showError("タイムアウトしました。もう一度お試しください。");
   return null;
@@ -1416,11 +1327,8 @@ function showResults(data, mode) {
   resultEl.classList.add('active');
   document.getElementById('webSubmitBtn').disabled = false;
   document.getElementById('gbpSubmitBtn').disabled = false;
-
-  // 成功Lottie再生
   document.getElementById('successLottie').setAttribute('autoplay', '');
 
-  // 診断タイプバッジ
   const typeBadge = document.getElementById('resultTypeBadge');
   if (mode === 'gbp') {
     typeBadge.className = 'result-type-badge badge-gbp';
@@ -1430,64 +1338,43 @@ function showResults(data, mode) {
     typeBadge.textContent = '🌐 Web診断';
   }
 
-  // サイト情報
-  const displayName = mode === 'gbp' && data.business_name
-    ? data.business_name
-    : (data.analyzed_url || '');
+  const displayName = mode === 'gbp' && data.business_name ? data.business_name : (data.analyzed_url || '');
   document.getElementById('resultUrl').textContent = displayName;
   document.getElementById('resultDate').textContent = '分析日時: ' + new Date().toLocaleString('ja-JP');
 
-  // GBPニュース
   const newsCard = document.getElementById('gbpNewsCard');
   if (mode === 'gbp' && data.gbp_news) {
     newsCard.style.display = 'block';
     document.getElementById('gbpNewsText').textContent = data.gbp_news;
-  } else {
-    newsCard.style.display = 'none';
-  }
+  } else { newsCard.style.display = 'none'; }
 
-  // サマリー
   document.getElementById('summaryText').textContent = data.summary || '';
 
-  // スコア（円形ゲージ）
   const target = data.overall_score;
   const color = scoreColor(target);
   const scoreEl = document.getElementById('scoreNumber');
   animateCount(scoreEl, target, color);
 
-  // ゲージアニメーション
   const gaugeFill = document.getElementById('gaugeFill');
   gaugeFill.style.stroke = color;
-  const circumference = 2 * Math.PI * 65; // r=65
+  const circumference = 2 * Math.PI * 65;
   const offset = circumference - (circumference * target / 100);
   setTimeout(() => { gaugeFill.style.strokeDashoffset = offset; }, 100);
 
-  // グレード
   const gradeEl = document.getElementById('gradeLabel');
   gradeEl.textContent = data.grade;
-  if (target >= 80) {
-    gradeEl.style.background = 'var(--good-bg)'; gradeEl.style.color = 'var(--good)';
-  } else if (target >= 50) {
-    gradeEl.style.background = 'var(--warn-bg)'; gradeEl.style.color = 'var(--warn)';
-  } else {
-    gradeEl.style.background = 'var(--bad-bg)'; gradeEl.style.color = 'var(--bad)';
-  }
+  if (target >= 80) { gradeEl.style.background = 'var(--good-bg)'; gradeEl.style.color = 'var(--good)'; }
+  else if (target >= 50) { gradeEl.style.background = 'var(--warn-bg)'; gradeEl.style.color = 'var(--warn)'; }
+  else { gradeEl.style.background = 'var(--bad-bg)'; gradeEl.style.color = 'var(--bad)'; }
 
-  // カテゴリ設定
   const catIcons = mode === 'gbp' ? GBP_CATEGORY_ICONS : WEB_CATEGORY_ICONS;
   const catNames = mode === 'gbp' ? GBP_CATEGORY_NAMES : WEB_CATEGORY_NAMES;
   const catOrder = mode === 'gbp' ? GBP_CATEGORY_ORDER : WEB_CATEGORY_ORDER;
-
   const catKeys = catOrder.filter(k => data.categories[k]);
-  Object.keys(data.categories).forEach(k => {
-    if (!catKeys.includes(k)) catKeys.push(k);
-  });
+  Object.keys(data.categories).forEach(k => { if (!catKeys.includes(k)) catKeys.push(k); });
 
-  // セクションタイトル
-  document.getElementById('metricsTitle').textContent =
-    mode === 'gbp' ? '6つの評価指標' : '5つの評価指標';
+  document.getElementById('metricsTitle').textContent = mode === 'gbp' ? '6つの評価指標' : '5つの評価指標';
 
-  // 指標バー
   const metricsEl = document.getElementById('metricsGrid');
   metricsEl.innerHTML = '';
   catKeys.forEach((key, i) => {
@@ -1509,7 +1396,6 @@ function showResults(data, mode) {
     setTimeout(() => { row.querySelector('.metric-bar-fill').style.width = cat.score + '%'; }, 300 + i * 120);
   });
 
-  // 詳細カード
   const cardsEl = document.getElementById('detailCards');
   cardsEl.innerHTML = '';
   catKeys.forEach((key, i) => {
@@ -1525,10 +1411,7 @@ function showResults(data, mode) {
     card.className = 'detail-card';
     card.innerHTML = `
       <div class="card-head">
-        <div class="card-title">
-          <span>${icon}</span><span>${cat.title}</span>
-          <span class="metric-badge ${badge.cls}">${badge.text}</span>
-        </div>
+        <div class="card-title"><span>${icon}</span><span>${cat.title}</span><span class="metric-badge ${badge.cls}">${badge.text}</span></div>
         <span class="card-score" style="color:${barColor};">${cat.score}<span style="font-size:12px;color:var(--text-sub);font-weight:500;"> / 100</span></span>
       </div>
       <div class="card-bar-wrap"><div class="card-bar-fill" style="background:${barColor};"></div></div>
@@ -1539,7 +1422,6 @@ function showResults(data, mode) {
     setTimeout(() => { card.querySelector('.card-bar-fill').style.width = cat.score + '%'; }, 600 + i * 150);
   });
 
-  // アクションアイテム
   const actionsEl = document.getElementById('topActions');
   actionsEl.innerHTML = '';
   if (data.top_actions) {
@@ -1547,90 +1429,47 @@ function showResults(data, mode) {
       const pi = priorityInfo(a.priority);
       const item = document.createElement('div');
       item.className = 'action-item';
-      item.innerHTML = `
-        <span class="action-priority ${pi.cls}">${pi.icon} ${pi.text}</span>
-        <span class="action-text">${a.action}</span>
-      `;
+      item.innerHTML = `<span class="action-priority ${pi.cls}">${pi.icon} ${pi.text}</span><span class="action-text">${a.action}</span>`;
       actionsEl.appendChild(item);
     });
   }
 
-  // 実践ガイド
   const guideSection = document.getElementById('practicalGuideSection');
   const guideContent = document.getElementById('practicalGuideContent');
   if (data.practical_guide) {
     guideSection.style.display = 'block';
     guideContent.innerHTML = '';
     const pg = data.practical_guide;
-
-    // Web診断: llms.txtサンプル
     if (pg.llms_txt_sample) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block">
-        <p class="guide-block-title">📁 llms.txt サンプル（コピーして使える）</p>
-        <div style="position:relative;">
-          <pre id="llmsTxtCode">${escapeHtml(pg.llms_txt_sample)}</pre>
-          <button class="copy-code-btn" onclick="copyCode('llmsTxtCode', this)">コピー</button>
-        </div>
-      </div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">📁 llms.txt サンプル（コピーして使える）</p><div style="position:relative;"><pre id="llmsTxtCode">${escapeHtml(pg.llms_txt_sample)}</pre><button class="copy-code-btn" onclick="copyCode('llmsTxtCode', this)">コピー</button></div></div>`;
       guideContent.appendChild(block);
     }
-
-    // Web診断: JSON-LDサンプル
     if (pg.schema_suggestion) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block">
-        <p class="guide-block-title">🏗️ 構造化データ サンプル（JSON-LD）</p>
-        <div style="position:relative;">
-          <pre id="schemaCode">${escapeHtml(pg.schema_suggestion)}</pre>
-          <button class="copy-code-btn" onclick="copyCode('schemaCode', this)">コピー</button>
-        </div>
-      </div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">🏗️ 構造化データ サンプル（JSON-LD）</p><div style="position:relative;"><pre id="schemaCode">${escapeHtml(pg.schema_suggestion)}</pre><button class="copy-code-btn" onclick="copyCode('schemaCode', this)">コピー</button></div></div>`;
       guideContent.appendChild(block);
     }
-
-    // Web診断: FAQ案
     if (pg.faq_ideas && pg.faq_ideas.length > 0) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block">
-        <p class="guide-block-title">❓ AI引用されやすいFAQ案</p>
-        <ul class="faq-list">${pg.faq_ideas.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
-      </div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">❓ AI引用されやすいFAQ案</p><ul class="faq-list">${pg.faq_ideas.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul></div>`;
       guideContent.appendChild(block);
     }
-
-    // GBP診断: 投稿サンプル
     if (pg.gbp_post_sample) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block">
-        <p class="guide-block-title">📢 GBP投稿サンプル（今すぐ使える）</p>
-        <div class="guide-text-block" style="position:relative;">
-          <span id="gbpPostText">${escapeHtml(pg.gbp_post_sample)}</span>
-          <button class="copy-code-btn" style="top:8px;right:8px;background:rgba(0,0,0,0.08);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('gbpPostText', this)">コピー</button>
-        </div>
-      </div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">📢 GBP投稿サンプル（今すぐ使える）</p><div class="guide-text-block" style="position:relative;"><span id="gbpPostText">${escapeHtml(pg.gbp_post_sample)}</span><button class="copy-code-btn" style="top:8px;right:8px;background:rgba(255,255,255,0.1);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('gbpPostText', this)">コピー</button></div></div>`;
       guideContent.appendChild(block);
     }
-
-    // GBP診断: クチコミ返信テンプレート
     if (pg.response_template) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
-      block.innerHTML = `<div class="guide-block">
-        <p class="guide-block-title">💬 クチコミ返信テンプレート</p>
-        <div class="guide-text-block" style="position:relative;">
-          <span id="responseTemplateText">${escapeHtml(pg.response_template)}</span>
-          <button class="copy-code-btn" style="top:8px;right:8px;background:rgba(0,0,0,0.08);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('responseTemplateText', this)">コピー</button>
-        </div>
-      </div>`;
+      block.innerHTML = `<div class="guide-block"><p class="guide-block-title">💬 クチコミ返信テンプレート</p><div class="guide-text-block" style="position:relative;"><span id="responseTemplateText">${escapeHtml(pg.response_template)}</span><button class="copy-code-btn" style="top:8px;right:8px;background:rgba(255,255,255,0.1);color:var(--text-sub);border-color:var(--border);" onclick="copyCode('responseTemplateText', this)">コピー</button></div></div>`;
       guideContent.appendChild(block);
     }
-
-    // クイックウィン（共通）
     if (pg.quick_wins && pg.quick_wins.length > 0) {
       const block = document.createElement('div');
       block.className = 'practical-guide';
@@ -1638,22 +1477,13 @@ function showResults(data, mode) {
       pg.quick_wins.forEach(qw => {
         const impactCls = qw.impact === 'high' ? 'p-high' : qw.impact === 'medium' ? 'p-medium' : 'p-low';
         const impactText = qw.impact === 'high' ? '高' : qw.impact === 'medium' ? '中' : '低';
-        html += `<div class="quick-win-item">
-          <div class="qw-header">
-            <span class="qw-title">${escapeHtml(qw.title)}</span>
-            <span class="qw-impact ${impactCls}">効果: ${impactText}</span>
-          </div>
-          <ol>${qw.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
-        </div>`;
+        html += `<div class="quick-win-item"><div class="qw-header"><span class="qw-title">${escapeHtml(qw.title)}</span><span class="qw-impact ${impactCls}">効果: ${impactText}</span></div><ol>${qw.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`;
       });
       block.innerHTML = html;
       guideContent.appendChild(block);
     }
-  } else {
-    guideSection.style.display = 'none';
-  }
+  } else { guideSection.style.display = 'none'; }
 
-  // GBP診断結果表示後に動画セクション・新機能ボタン・チャットFABを表示
   if (mode === 'gbp') {
     showVideoSection(data.analyzed_url || '');
     currentGbpBusinessName = data.business_name || "";
@@ -1661,14 +1491,11 @@ function showResults(data, mode) {
     if (gbpActions) gbpActions.style.display = "block";
     const geoActions2 = document.getElementById("geo-report-actions");
     if (geoActions2) geoActions2.style.display = "none";
-    // 新機能エリア表示
     document.getElementById('new-features-area').style.display = 'block';
     document.getElementById('action-plan-area').style.display = 'none';
     document.getElementById('competitor-area').style.display = 'none';
-    // チャットFAB表示
     document.getElementById('chat-fab').classList.remove('hidden');
-    chatHistory = [];
-    chatInitialized = false;
+    chatHistory = []; chatInitialized = false;
     document.getElementById('chat-messages').innerHTML = '';
   } else {
     document.getElementById('video-section').style.display = 'none';
@@ -1681,11 +1508,9 @@ function showResults(data, mode) {
     const gbpActions2 = document.getElementById("gbp-report-actions");
     if (gbpActions2) gbpActions2.style.display = "none";
   }
-
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// カウントアップアニメーション
 function animateCount(el, target, color) {
   el.style.color = color;
   let current = 0;
@@ -1710,8 +1535,7 @@ function escapeHtml(str) {
 
 function copyCode(elId, btn) {
   const el = document.getElementById(elId);
-  const code = el.textContent;
-  navigator.clipboard.writeText(code).then(() => {
+  navigator.clipboard.writeText(el.textContent).then(() => {
     btn.textContent = 'コピー済';
     setTimeout(() => { btn.textContent = 'コピー'; }, 2000);
   });
@@ -1722,48 +1546,32 @@ function backToForm() {
   document.getElementById('resultSection').classList.remove('active');
   document.getElementById('errorSection').classList.remove('active');
   document.getElementById('mainSection').classList.remove('hidden');
-  // ゲージリセット
   document.getElementById('gaugeFill').style.strokeDashoffset = 408;
-  // チャット非表示
   document.getElementById('chat-fab').classList.add('hidden');
   document.getElementById('chat-panel').classList.remove('open');
   chatOpen = false;
-  if (currentMode === 'gbp') {
-    document.getElementById('gbpUrlInput').focus();
-  } else {
-    document.getElementById('webUrlInput').focus();
-  }
+  if (currentMode === 'gbp') { document.getElementById('gbpUrlInput').focus(); }
+  else { document.getElementById('webUrlInput').focus(); }
 }
 
 function copyReport() {
   if (!lastResult) return;
   const d = lastResult;
   const mode = d._mode || 'web';
-  let text = mode === 'gbp'
-    ? `【AI検索GBP改善君 GBP診断レポート】\n`
-    : `【AI検索GBP改善君 Webサイト診断レポート】\n`;
-  if (mode === 'gbp' && d.business_name) {
-    text += `ビジネス名: ${d.business_name}\n`;
-  }
+  let text = mode === 'gbp' ? `【ZETT-AI GBP診断レポート】\n` : `【ZETT-AI Webサイト診断レポート】\n`;
+  if (mode === 'gbp' && d.business_name) text += `ビジネス名: ${d.business_name}\n`;
   text += `URL: ${d.analyzed_url}\n`;
   text += `総合スコア: ${d.overall_score}/100 (${d.grade})\n\n`;
-  text += `${d.summary}\n\n`;
-  text += `--- カテゴリ別スコア ---\n`;
+  text += `${d.summary}\n\n--- カテゴリ別スコア ---\n`;
   for (const cat of Object.values(d.categories)) {
-    text += `\n■ ${cat.title}: ${cat.score}/100\n`;
-    text += `${cat.detail}\n`;
-    if (cat.recommendations) {
-      cat.recommendations.forEach(r => { text += `  ✓ ${r}\n`; });
-    }
+    text += `\n■ ${cat.title}: ${cat.score}/100\n${cat.detail}\n`;
+    if (cat.recommendations) cat.recommendations.forEach(r => { text += `  ✓ ${r}\n`; });
   }
   text += `\n--- 今すぐやること ---\n`;
-  if (d.top_actions) {
-    d.top_actions.forEach(a => {
-      const label = a.priority === 'high' ? '【高】' : a.priority === 'medium' ? '【中】' : '【低】';
-      text += `${label} ${a.action}\n`;
-    });
-  }
-
+  if (d.top_actions) d.top_actions.forEach(a => {
+    const label = a.priority === 'high' ? '【高】' : a.priority === 'medium' ? '【中】' : '【低】';
+    text += `${label} ${a.action}\n`;
+  });
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('copyBtn');
     btn.textContent = 'コピーしました';
@@ -1772,7 +1580,7 @@ function copyReport() {
   });
 }
 
-// ===== 動画生成機能 =====
+// ===== 動画生成 =====
 let currentVideoJobId = null;
 let videoPollingTimer = null;
 let currentGbpUrl = "";
@@ -1783,20 +1591,17 @@ function showVideoSection(gbpUrl) {
   document.getElementById("video-progress").style.display = "none";
   document.getElementById("video-done").style.display = "none";
   document.getElementById("video-error").style.display = "none";
-  document.getElementById("video-start-btn").disabled = false;
-  document.getElementById("video-start-btn").style.display = "block";
 }
 
 async function startVideoGeneration(sparkle) {
   const btnNormal = document.getElementById("btn-normal");
   const btnSparkle = document.getElementById("btn-sparkle");
-  if (btnNormal) { btnNormal.disabled = true; }
-  if (btnSparkle) { btnSparkle.disabled = true; }
+  if (btnNormal) btnNormal.disabled = true;
+  if (btnSparkle) btnSparkle.disabled = true;
   document.getElementById("video-progress").style.display = "block";
   document.getElementById("video-done").style.display = "none";
   document.getElementById("video-error").style.display = "none";
   updateProgressBar(5, "写真を取得中...");
-
   try {
     const res = await fetch("/api/create-video", {
       method: "POST",
@@ -1804,15 +1609,11 @@ async function startVideoGeneration(sparkle) {
       body: JSON.stringify({ url: currentGbpUrl, sparkle: !!sparkle })
     });
     const data = await res.json();
-    if (!res.ok || data.error) {
-      showVideoError(data.error || "動画生成の開始に失敗しました");
-      return;
-    }
+    if (!res.ok || data.error) { showVideoError(data.error || "動画生成の開始に失敗しました"); return; }
     currentVideoJobId = data.job_id;
     pollVideoStatus();
-  } catch (e) {
-    showVideoError("通信エラーが発生しました");
-  } finally {
+  } catch (e) { showVideoError("通信エラーが発生しました"); }
+  finally {
     const bn = document.getElementById("btn-normal");
     const bs = document.getElementById("btn-sparkle");
     if (bn) bn.disabled = false;
@@ -1826,24 +1627,15 @@ function pollVideoStatus() {
     try {
       const res = await fetch("/api/video-status/" + currentVideoJobId);
       const data = await res.json();
-
       const statusMap = {
-        "pending": [5, "準備中..."],
-        "scraping": [25, "GoogleマップのAI写真を取得中..."],
-        "downloading": [55, "写真をダウンロード中..."],
-        "encoding": [80, "動画をエンコード中..."],
+        "pending": [5, "準備中..."], "scraping": [25, "GoogleマップのAI写真を取得中..."],
+        "downloading": [55, "写真をダウンロード中..."], "encoding": [80, "動画をエンコード中..."],
         "done": [100, "完成！"],
       };
       const [pct, msg] = statusMap[data.status] || [data.progress || 0, "処理中..."];
       updateProgressBar(pct, msg);
-
-      if (data.status === "done") {
-        clearInterval(videoPollingTimer);
-        showVideoDone();
-      } else if (data.status === "error") {
-        clearInterval(videoPollingTimer);
-        showVideoError(data.error || "エラーが発生しました");
-      }
+      if (data.status === "done") { clearInterval(videoPollingTimer); showVideoDone(); }
+      else if (data.status === "error") { clearInterval(videoPollingTimer); showVideoError(data.error || "エラーが発生しました"); }
     } catch (e) {}
   }, 2000);
 }
@@ -1856,28 +1648,23 @@ function updateProgressBar(pct, msg) {
 function showVideoDone() {
   document.getElementById("video-progress").style.display = "none";
   document.getElementById("video-done").style.display = "block";
-  const link = document.getElementById("video-download-link");
-  link.href = "/api/video-download/" + currentVideoJobId;
+  document.getElementById("video-download-link").href = "/api/video-download/" + currentVideoJobId;
   const mailSection = document.getElementById("video-mail-section");
   if (mailSection) mailSection.style.display = "block";
 }
 
 function showVideoError(msg) {
   document.getElementById("video-progress").style.display = "none";
-  document.getElementById("video-start-btn").style.display = "block";
-  document.getElementById("video-start-btn").disabled = false;
   const errEl = document.getElementById("video-error");
   errEl.textContent = "❌ " + msg;
   errEl.style.display = "block";
 }
 
-// ===== レポート共有・メール送信 =====
+// ===== レポート共有 =====
 let currentGbpBusinessName = "";
 
 function copyReportType(type) {
-  const el = type === "gbp"
-    ? (document.getElementById("gbp-result-content") || document.querySelector(".gbp-categories") || document.getElementById("resultSection"))
-    : (document.getElementById("result-content") || document.querySelector(".categories-grid") || document.getElementById("resultSection"));
+  const el = document.getElementById("resultSection");
   if (!el) return;
   navigator.clipboard.writeText(el.innerText).then(() => {
     const btn = document.getElementById(type + "-copy-btn");
@@ -1890,19 +1677,14 @@ async function sendReportEmail(type) {
   const msgEl = document.getElementById(type + "-report-msg");
   const btn = document.getElementById(type + "-send-btn");
   if (!email) { showMsg(msgEl, "❌ メールアドレスを入力してください", false); return; }
-
-  const reportEl = type === "gbp"
-    ? (document.getElementById("gbp-result-content") || document.querySelector(".gbp-categories") || document.getElementById("resultSection"))
-    : (document.getElementById("result-content") || document.querySelector(".categories-grid") || document.getElementById("resultSection"));
+  const reportEl = document.getElementById("resultSection");
   const reportHtml = reportEl ? reportEl.innerHTML : "";
-  const bizName = type === "gbp" ? (currentGbpBusinessName || "") : (document.getElementById("url-input") || document.getElementById("site-url") || {value:""}).value;
+  const bizName = type === "gbp" ? (currentGbpBusinessName || "") : "";
   const rtype = type === "gbp" ? "GBP診断" : "Webサイト診断";
-
   btn.disabled = true; btn.textContent = "送信中...";
   try {
     const res = await fetch("/api/send-report", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
+      method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({email, business_name: bizName, report_html: reportHtml, report_type: rtype})
     });
     const d = await res.json();
@@ -1917,12 +1699,10 @@ async function sendVideoMail() {
   const msgEl = document.getElementById("video-mail-msg");
   const btn = document.getElementById("video-send-btn");
   if (!email) { showMsg(msgEl, "❌ メールアドレスを入力してください", false); return; }
-
   btn.disabled = true; btn.textContent = "送信中...";
   try {
     const res = await fetch("/api/send-video", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
+      method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({job_id: currentVideoJobId, email, business_name: name})
     });
     const d = await res.json();
@@ -1932,10 +1712,9 @@ async function sendVideoMail() {
 }
 
 function showMsg(el, msg, ok) {
-  el.textContent = msg;
-  el.style.display = "block";
-  el.style.background = ok ? "#E6F4EA" : "#FCE8E6";
-  el.style.color = ok ? "#34A853" : "#EA4335";
+  el.textContent = msg; el.style.display = "block";
+  el.style.background = ok ? "var(--good-bg)" : "var(--bad-bg)";
+  el.style.color = ok ? "var(--good)" : "var(--bad)";
 }
 
 // ===== 90日アクションプラン =====
@@ -1945,8 +1724,7 @@ async function generateActionPlan() {
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
     const res = await fetch('/api/action-plan', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({gbp_result: lastResult})
     });
     const data = await res.json();
@@ -1959,19 +1737,16 @@ async function generateActionPlan() {
 }
 
 function renderActionPlan(data) {
-  // クイックウィン
   const qwEl = document.getElementById('plan-quick-wins');
   if (data.quick_wins && data.quick_wins.length) {
     qwEl.innerHTML = '<div class="plan-quick-wins"><h4>⚡ 今日すぐできること</h4>' +
       data.quick_wins.map(w => `<label><input type="checkbox"> ${escapeHtml(w)}</label>`).join('') + '</div>';
   }
-  // KPIs
   const kpiEl = document.getElementById('plan-kpis');
   if (data.kpis && data.kpis.length) {
     kpiEl.innerHTML = '<div class="plan-kpis"><h4>🎯 90日後の目標</h4><ul>' +
       data.kpis.map(k => `<li>${escapeHtml(k)}</li>`).join('') + '</ul></div>';
   }
-  // タイムライン
   const tlEl = document.getElementById('plan-timeline');
   tlEl.innerHTML = '';
   if (data.weeks) {
@@ -1979,13 +1754,7 @@ function renderActionPlan(data) {
       const phase = i < 2 ? 'phase-green' : i < 4 ? 'phase-blue' : 'phase-purple';
       const div = document.createElement('div');
       div.className = `plan-week ${phase}`;
-      div.innerHTML = `
-        <div class="plan-week-header">
-          <span class="plan-week-label">${escapeHtml(w.week)}</span>
-          <span class="plan-week-theme">${escapeHtml(w.theme)}</span>
-        </div>
-        <ul class="plan-week-tasks">${(w.tasks||[]).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-      `;
+      div.innerHTML = `<div class="plan-week-header"><span class="plan-week-label">${escapeHtml(w.week)}</span><span class="plan-week-theme">${escapeHtml(w.theme)}</span></div><ul class="plan-week-tasks">${(w.tasks||[]).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
       div.addEventListener('click', () => div.classList.toggle('open'));
       tlEl.appendChild(div);
     });
@@ -1999,13 +1768,8 @@ async function runCompetitorAnalysis() {
   btn.disabled = true; btn.textContent = '⏳ 分析中...';
   try {
     const res = await fetch('/api/competitor-analysis', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        url: lastResult.analyzed_url || '',
-        business_name: lastResult.business_name || '',
-        category: ''
-      })
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url: lastResult.analyzed_url || '', business_name: lastResult.business_name || '', category: '' })
     });
     const data = await res.json();
     if (!res.ok || data.error) { alert(data.error || 'エラーが発生しました'); return; }
@@ -2018,10 +1782,8 @@ async function runCompetitorAnalysis() {
 
 function renderCompetitorAnalysis(data) {
   const comps = data.competitors || [];
-  // テーブル
   const tableWrap = document.getElementById('competitor-table-wrap');
   let html = '<table class="competitor-table"><tr><th>店舗名</th><th>評価</th><th>口コミ数</th><th>写真数</th><th>推定スコア</th></tr>';
-  // 自分の行
   html += `<tr class="highlight"><td>${escapeHtml(lastResult.business_name || 'あなたの店')}</td><td>-</td><td>-</td><td>-</td><td>${lastResult.overall_score || '-'}</td></tr>`;
   comps.forEach(c => {
     html += `<tr><td>${escapeHtml(c.name)}</td><td>${c.rating || '-'}</td><td>${c.review_count || '-'}</td><td>${c.photo_count || '-'}</td><td>${c.estimated_score || '-'}</td></tr>`;
@@ -2029,28 +1791,19 @@ function renderCompetitorAnalysis(data) {
   html += '</table>';
   tableWrap.innerHTML = html;
 
-  // バーチャート（CSS）
   const chartWrap = document.getElementById('competitor-chart-wrap');
   const allScores = [lastResult.overall_score || 0, ...comps.map(c => c.estimated_score || 0)];
   const maxScore = Math.max(...allScores, 1);
   let chartHtml = '<div style="display:flex;flex-direction:column;gap:8px">';
-  // 自店
   const myPct = ((lastResult.overall_score||0)/maxScore*100).toFixed(0);
-  chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px">
-    <span style="width:100px;font-weight:700;color:var(--primary);text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(lastResult.business_name||'あなたの店')}</span>
-    <div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${myPct}%;background:var(--primary)"></div></div>
-    <span style="font-weight:700;color:var(--primary)">${lastResult.overall_score||0}</span></div>`;
+  chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:100px;font-weight:700;color:var(--accent);text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(lastResult.business_name||'あなたの店')}</span><div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${myPct}%;background:var(--accent)"></div></div><span style="font-weight:700;color:var(--accent)">${lastResult.overall_score||0}</span></div>`;
   comps.forEach(c => {
     const pct = ((c.estimated_score||0)/maxScore*100).toFixed(0);
-    chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px">
-      <span style="width:100px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(c.name)}</span>
-      <div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${pct}%;background:#5F6368"></div></div>
-      <span>${c.estimated_score||0}</span></div>`;
+    chartHtml += `<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:100px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${escapeHtml(c.name)}</span><div class="comp-bar-wrap" style="flex:1;width:auto"><div class="comp-bar-fill" style="width:${pct}%;background:var(--muted)"></div></div><span>${c.estimated_score||0}</span></div>`;
   });
   chartHtml += '</div>';
   chartWrap.innerHTML = chartHtml;
 
-  // アドバイス
   const adviceWrap = document.getElementById('competitor-advice-wrap');
   let advHtml = '';
   if (data.positioning) {
@@ -2073,12 +1826,9 @@ function toggleChat() {
   document.getElementById('chat-panel').classList.toggle('open', chatOpen);
   if (chatOpen && !chatInitialized && lastResult && lastResult._mode === 'gbp') {
     chatInitialized = true;
-    // 初回メッセージ自動送信
     sendChatMessageText('この店舗のGBPで最も重要な改善点を教えてください');
   }
-  if (chatOpen) {
-    document.getElementById('chat-input').focus();
-  }
+  if (chatOpen) document.getElementById('chat-input').focus();
 }
 
 function sendChatMessage() {
@@ -2091,36 +1841,25 @@ function sendChatMessage() {
 
 async function sendChatMessageText(msg) {
   const messagesEl = document.getElementById('chat-messages');
-  // ユーザーメッセージ表示
   chatHistory.push({role: 'user', content: msg});
   const userBubble = document.createElement('div');
   userBubble.className = 'chat-msg user';
   userBubble.textContent = msg;
   messagesEl.appendChild(userBubble);
-
-  // ローディング表示
   const loadingBubble = document.createElement('div');
   loadingBubble.className = 'chat-msg loading';
   loadingBubble.textContent = '考え中...';
   messagesEl.appendChild(loadingBubble);
   messagesEl.scrollTop = messagesEl.scrollHeight;
-
   const sendBtn = document.getElementById('chat-send-btn');
   sendBtn.disabled = true;
-
   try {
     const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        message: msg,
-        context: lastResult || {},
-        history: chatHistory.slice(-10)
-      })
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: msg, context: lastResult || {}, history: chatHistory.slice(-10) })
     });
     const data = await res.json();
     loadingBubble.remove();
-
     const reply = data.reply || data.error || 'エラーが発生しました';
     chatHistory.push({role: 'assistant', content: reply});
     const aiBubble = document.createElement('div');
