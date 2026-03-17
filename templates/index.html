@@ -846,39 +846,61 @@
                 GBPに動画を追加するだけでAI検索・MEO評価がUP
               </p>
               <p style="font-size:13px;color:var(--text-sub);">
-                GoogleマップのURLを貼るだけ。写真を自動収集して20秒の動画を無料生成。
+                GoogleマップのURLを貼るだけ。写真を自動収集して動画を無料生成。
               </p>
             </div>
 
             <!-- URL入力 -->
-            <form id="videoForm" class="form-wrap" onsubmit="startVideoGeneration(event)">
-              <input type="text" id="videoUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url">
-              <button type="submit" id="videoSubmitBtn" class="submit-btn gbp-btn" style="white-space:nowrap;">動画を生成</button>
+            <form id="videoForm" class="form-wrap" style="flex-wrap:wrap;gap:10px;">
+              <input type="text" id="videoUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url" style="flex:1;min-width:200px;">
             </form>
             <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code></p>
 
+            <!-- スタイル選択ボタン -->
+            <div style="display:flex;gap:10px;margin-top:16px;">
+              <button type="button" id="btnNormal" onclick="startVideoWithStyle('normal')" style="flex:1;padding:14px 16px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                🎬 ノーマル動画
+              </button>
+              <button type="button" id="btnSparkle" onclick="startVideoWithStyle('sparkle')" style="flex:1;padding:14px 16px;background:linear-gradient(135deg,#FF6B9D,#C44AFF);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                ✨ キラキラ動画
+              </button>
+            </div>
+
             <!-- サンプル動画セクション -->
             <div style="margin-top:20px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
-              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">📽️ サンプル動画（こんな動画が生成されます）</p>
-              <div style="background:#1A1A2E;border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;position:relative;overflow:hidden;">
-                <div class="sample-slide" style="position:absolute;inset:0;background:linear-gradient(135deg,#1A73E820,#34A85320);display:flex;align-items:center;justify-content:center;">
-                  <div style="text-align:center;color:white;">
-                    <div style="font-size:36px;margin-bottom:8px;">🏪</div>
-                    <div style="font-size:14px;font-weight:600;">店舗外観</div>
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">📽️ こんな動画が生成されます</p>
+              
+              <!-- ノーマル vs キラキラ比較 -->
+              <div style="display:flex;gap:10px;">
+                <!-- ノーマルサンプル -->
+                <div style="flex:1;">
+                  <div style="background:#2C3E50;border-radius:8px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+                    <div style="text-align:center;color:white;z-index:1;">
+                      <div style="font-size:28px;margin-bottom:6px;">🏪</div>
+                      <div style="font-size:11px;font-weight:600;">ノーマル</div>
+                    </div>
+                    <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:white;font-size:10px;padding:2px 6px;border-radius:3px;">10秒</div>
                   </div>
+                  <p style="text-align:center;font-size:11px;color:var(--text-sub);margin-top:6px;">シンプルで見やすい</p>
                 </div>
-                <div style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;">
-                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.9;"></div>
-                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.4;"></div>
-                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.4;"></div>
-                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.4;"></div>
+                <!-- キラキラサンプル -->
+                <div style="flex:1;">
+                  <div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:8px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+                    <div style="position:absolute;inset:0;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50" font-size="20">✨</text></svg>') repeat;opacity:0.3;"></div>
+                    <div style="text-align:center;color:white;z-index:1;">
+                      <div style="font-size:28px;margin-bottom:6px;">✨</div>
+                      <div style="font-size:11px;font-weight:600;">キラキラ</div>
+                    </div>
+                    <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:white;font-size:10px;padding:2px 6px;border-radius:3px;">10秒</div>
+                  </div>
+                  <p style="text-align:center;font-size:11px;color:var(--text-sub);margin-top:6px;">エフェクト付きで華やか</p>
                 </div>
-                <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;font-size:11px;padding:2px 8px;border-radius:4px;">20秒</div>
               </div>
-              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                <span style="background:#E8F0FE;color:#1A73E8;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;">✅ 写真を自動収集</span>
-                <span style="background:#E6F4EA;color:#34A853;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;">✅ 最大12枚スライド</span>
-                <span style="background:#FEF7E0;color:#F59E0B;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;">✅ GBPにそのままアップ可</span>
+
+              <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
+                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 写真自動収集</span>
+                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 最大12枚</span>
+                <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ GBPにアップ可</span>
               </div>
             </div>
 
@@ -1510,6 +1532,23 @@ function normalizeGbpUrl(input) {
   if (/^javascript:/i.test(url) || /^data:/i.test(url) || /^vbscript:/i.test(url)) return "";
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
   return url;
+}
+
+let selectedVideoStyle = 'normal';
+
+function startVideoWithStyle(style) {
+  selectedVideoStyle = style;
+  const url = document.getElementById('videoUrlInput').value.trim();
+  if (!url) {
+    alert('GoogleマップのURLを入力してください');
+    document.getElementById('videoUrlInput').focus();
+    return;
+  }
+  // 選択状態を視覚的に表示
+  document.getElementById('btnNormal').style.opacity = style === 'normal' ? '1' : '0.6';
+  document.getElementById('btnSparkle').style.opacity = style === 'sparkle' ? '1' : '0.6';
+  // 動画生成開始
+  startVideoGeneration({ preventDefault: () => {} });
 }
 
 async function startVideoGeneration(e) {
