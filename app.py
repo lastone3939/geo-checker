@@ -1463,27 +1463,39 @@ def send_video_email(to_email: str, business_name: str, video_path: Path) -> boo
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = SMTP_FROM
+        msg['From'] = f"清水 望（株式会社ZETTAI） <{SMTP_FROM}>"
+        msg['Reply-To'] = "nozomu.shimizu@zettai.co.jp"
         msg['To'] = to_email
-        msg['Subject'] = f"【{business_name}】GBPスライドショー動画のお届け"
+        msg['Subject'] = f"【ZETT-AI】GBPスライドショー動画をお届けします｜株式会社ZETTAI"
         body = f"""{business_name} 様
 
-GBPスライドショー動画を作成しましたのでお届けします。
+この度はZETT-AIをご利用いただきありがとうございます。
 
-添付のMP4ファイルをGoogleビジネスプロフィールの
-「写真」→「動画」からアップロードしてください。
+ご要望のGBPスライドショー動画をお届けします。
+添付のMP4ファイルをGoogleビジネスプロフィールにアップロードするだけで、
+AI検索・MEO評価の向上が期待できます。
 
 【アップロード手順】
-1. business.google.com を開く
+1. business.google.com にアクセス
 2. 「写真を追加」→「動画」を選択
 3. 添付ファイルをアップロード
 
-動画のアップロードにより、GoogleマップのSEO評価が向上します。
-ご不明な点はお気軽にご連絡ください。
+動画のアップロードにより、
+・Googleマップでの露出アップ
+・Ask Maps（AI検索）への対応
+・クチコミ獲得率の向上
+が期待できます。
 
----
-株式会社ZETTAI / 清水 望
-nozomu.shimizu@zettai.co.jp""".strip()
+集客についてさらに詳しくご相談されたい場合は、
+お気軽にご連絡ください。
+
+━━━━━━━━━━━━━━━━━
+清水 望
+株式会社ZETTAI
+TEL: 080-4098-7362
+Email: nozomu.shimizu@zettai.co.jp
+HP: https://zettai.co.jp
+━━━━━━━━━━━━━━━━━""".strip()
 
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         with open(video_path, 'rb') as f:
@@ -1553,15 +1565,52 @@ def send_report():
         from email.mime.text import MIMEText
 
         msg = MIMEMultipart("alternative")
-        msg["From"] = SMTP_FROM
+        msg["From"] = f"清水 望（株式会社ZETTAI） <{SMTP_FROM}>"
+        msg["Reply-To"] = "nozomu.shimizu@zettai.co.jp"
         msg["To"] = to_email
-        msg["Subject"] = f"【{business_name}】{report_type}のお届け"
+        msg["Subject"] = f"【ZETT-AI】{business_name} 様のAI検索最適化レポートをお届けします｜株式会社ZETTAI"
 
-        text_body = f"{business_name} 様\n\n{report_type}をお届けします。\n\n---\n株式会社ZETTAI / 清水 望\nnozomu.shimizu@zettai.co.jp"
-        html_body = f"""<html><body style="font-family:sans-serif;max-width:700px;margin:0 auto;padding:20px">
-<p>{business_name} 様</p><p>{report_type}をお届けします。</p><hr>
-{report_html}
-<hr><p>株式会社ZETTAI / 清水 望<br><a href="mailto:nozomu.shimizu@zettai.co.jp">nozomu.shimizu@zettai.co.jp</a></p>
+        sig_text = """━━━━━━━━━━━━━━━━━
+清水 望
+株式会社ZETTAI
+TEL: 080-4098-7362
+Email: nozomu.shimizu@zettai.co.jp
+HP: https://zettai.co.jp
+━━━━━━━━━━━━━━━━━"""
+
+        text_body = f"""{business_name} 様
+
+この度はZETT-AIをご利用いただきありがとうございます。
+
+{business_name} 様のAI検索最適化レポートをお届けします。
+レポートの内容をもとに改善を進めることで、
+GoogleマップやAI検索（ChatGPT・Claude・Perplexity）での露出向上が期待できます。
+
+詳細なご相談・サポートをご希望の場合は、お気軽にご連絡ください。
+
+{sig_text}"""
+
+        sig_html = f"""<div style="margin-top:24px;padding-top:16px;border-top:1px solid #E8EAED;font-size:13px;color:#5F6368;line-height:1.8;">
+  <strong style="color:#202124;">清水 望</strong><br>
+  株式会社ZETTAI<br>
+  TEL: <a href="tel:08040987362" style="color:#1A73E8;">080-4098-7362</a><br>
+  Email: <a href="mailto:nozomu.shimizu@zettai.co.jp" style="color:#1A73E8;">nozomu.shimizu@zettai.co.jp</a><br>
+  HP: <a href="https://zettai.co.jp" style="color:#1A73E8;">https://zettai.co.jp</a>
+</div>"""
+
+        html_body = f"""<html><body style="font-family:'Noto Sans JP',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#202124;">
+<div style="background:#1A73E8;border-radius:12px 12px 0 0;padding:20px 24px;">
+  <span style="color:white;font-size:20px;font-weight:800;">ZETT-AI</span>
+  <span style="color:rgba(255,255,255,0.8);font-size:13px;margin-left:10px;">AI検索最適化レポート</span>
+</div>
+<div style="border:1px solid #E8EAED;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+  <p style="margin-bottom:16px;">{business_name} 様</p>
+  <p style="margin-bottom:20px;line-height:1.8;">この度はZETT-AIをご利用いただきありがとうございます。<br>
+  AI検索最適化レポートをお届けします。</p>
+  <hr style="border:none;border-top:1px solid #E8EAED;margin:20px 0;">
+  {report_html}
+  {sig_html}
+</div>
 </body></html>"""
 
         msg.attach(MIMEText(text_body, "plain", "utf-8"))
