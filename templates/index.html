@@ -921,60 +921,54 @@
       </div>
     </div>
 
-    <!-- サンプルレポートプレビュー -->
+    <!-- サンプルレポートプレビュー（zettai.co.jp） -->
     <div class="lp-section">
       <p class="lp-section-title">📊 診断するとこんなレポートが出ます</p>
-      <p class="lp-section-sub">URLを入力するだけで、6つの視点からAIが自動診断</p>
+      <p class="lp-section-sub">株式会社ZETTAIのサイトを実際に診断した結果です</p>
 
       <div class="sample-report">
-        <span class="sample-badge">サンプル</span>
-        <p class="sample-biz-name">焼肉 炭火苑 新宿店</p>
+        <span class="sample-badge">🌐 Webサイト診断</span>
+        <p class="sample-biz-name">zettai.co.jp</p>
         <div class="sample-score-row">
           <div class="sample-score-circle">
-            <span class="sample-score-num">62</span>
+            <span class="sample-score-num">51</span>
             <span class="sample-score-label">/ 100</span>
           </div>
           <div>
-            <span class="sample-grade">C</span>
-            <p class="sample-summary" style="margin-top:8px;">改善の余地が大きく、適切な対策で大幅なスコアアップが見込めます。</p>
+            <span class="sample-grade" style="background:var(--warn-bg);color:var(--warn);">D</span>
+            <p class="sample-summary" style="margin-top:8px;">AI検索への対応がまだ不十分。改善の余地が大きいです。</p>
           </div>
         </div>
 
         <div style="margin-bottom:20px;">
           <div class="s-bar-row">
-            <span class="s-bar-label">プロフィール完成度</span>
-            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:70%;background:var(--warn)"></div></div>
-            <span class="s-bar-score" style="color:var(--warn)">70</span>
+            <span class="s-bar-label">AIクローラーアクセス</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:62%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">62</span>
             <span class="s-bar-emoji">🟡</span>
           </div>
           <div class="s-bar-row">
-            <span class="s-bar-label">写真・動画</span>
+            <span class="s-bar-label">llms.txt品質</span>
             <div class="s-bar-wrap"><div class="s-bar-fill" style="width:35%;background:var(--bad)"></div></div>
             <span class="s-bar-score" style="color:var(--bad)">35</span>
             <span class="s-bar-emoji">🔴</span>
           </div>
           <div class="s-bar-row">
-            <span class="s-bar-label">クチコミ管理</span>
-            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:55%;background:var(--warn)"></div></div>
-            <span class="s-bar-score" style="color:var(--warn)">55</span>
+            <span class="s-bar-label">構造化データ</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:48%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">48</span>
             <span class="s-bar-emoji">🟡</span>
           </div>
           <div class="s-bar-row">
-            <span class="s-bar-label">投稿活動</span>
-            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:20%;background:var(--bad)"></div></div>
-            <span class="s-bar-score" style="color:var(--bad)">20</span>
-            <span class="s-bar-emoji">🔴</span>
+            <span class="s-bar-label">コンテンツ品質</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:58%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">58</span>
+            <span class="s-bar-emoji">🟡</span>
           </div>
           <div class="s-bar-row">
-            <span class="s-bar-label">Q&A管理</span>
-            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:15%;background:var(--bad)"></div></div>
-            <span class="s-bar-score" style="color:var(--bad)">15</span>
-            <span class="s-bar-emoji">🔴</span>
-          </div>
-          <div class="s-bar-row">
-            <span class="s-bar-label">ローカルSEO</span>
-            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:65%;background:var(--warn)"></div></div>
-            <span class="s-bar-score" style="color:var(--warn)">65</span>
+            <span class="s-bar-label">メタ情報</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:52%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">52</span>
             <span class="s-bar-emoji">🟡</span>
           </div>
         </div>
@@ -982,17 +976,21 @@
         <div class="sample-actions">
           <div class="sample-action">
             <span class="emoji">🔴</span>
-            <span>写真を最低20枚追加してください（現在推定3枚）</span>
-          </div>
-          <div class="sample-action">
-            <span class="emoji">🔴</span>
-            <span>投稿を月2〜4回のペースで開始してください</span>
+            <span>llms.txtファイルを正しいフォーマットで設置してください</span>
           </div>
           <div class="sample-action">
             <span class="emoji">🟡</span>
-            <span>未返信のクチコミに48時間以内に返信してください</span>
+            <span>JSON-LD構造化データを追加して情報を整理してください</span>
+          </div>
+          <div class="sample-action">
+            <span class="emoji">🟡</span>
+            <span>メタディスクリプションをAI向けに最適化してください</span>
           </div>
         </div>
+
+        <button onclick="switchTab('web');document.getElementById('webUrlInput').focus();" style="margin-top:16px;width:100%;padding:14px;background:var(--primary);color:white;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">
+          あなたのサイトを診断する →
+        </button>
       </div>
     </div>
 
