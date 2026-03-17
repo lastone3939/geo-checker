@@ -689,19 +689,43 @@ def get_query_from_url(url: str) -> tuple:
     return place_id, query, lat, lng
 
 
-def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
-    """Google Places APIで写真URLを取得（Place ID優先 → テキスト検索フォールバック）"""
+def _fuzzy_name_match(name_a: str, name_b: str, threshold: float = 0.6) -> bool:
+    """ビジネス名のあいまい一致判定（閾値以上で一致とみなす）"""
+    if not name_a or not name_b:
+        return True  # 比較対象がなければスキップ
+    a = re.sub(r'[\s\-・（）()【】「」\u3000]+', '', name_a).lower()
+    b = re.sub(r'[\s\-・（）()【】「」\u3000]+', '', name_b).lower()
+    if a == b:
+        return True
+    # 一方が他方を含むかチェック
+    if a in b or b in a:
+        return True
+    # 簡易的なJaccard類似度（文字ベース）
+    set_a, set_b = set(a), set(b)
+    if not set_a or not set_b:
+        return True
+    intersection = len(set_a & set_b)
+    union = len(set_a | set_b)
+    similarity = intersection / union
+    return similarity >= threshold
+
+
+def scrape_gbp_photos(url: str, max_photos: int = 12) -> tuple:
+    """Google Places APIで写真URLを取得（Place ID優先 → テキスト検索フォールバック）
+    戻り値: (photo_urls, verified_place_id)
+    """
     if not GOOGLE_PLACES_API_KEY:
         app.logger.error("GOOGLE_PLACES_API_KEY not set")
-        return []
+        return [], None
 
     # 短縮URL（share.google / maps.app.goo.gl）を展開
     url = resolve_url(url)
     app.logger.info(f"resolve後URL: {url[:100]}")
 
     place_id, query, lat, lng = get_query_from_url(url)
+    url_business_name = query  # URLから抽出したビジネス名（検証用）
     photos = []
-    biz_name = ""
+    verified_place_id = None
 
     # ルート1: Place IDが取れた場合 → Place Details APIで直接取得（最正確）
     if place_id:
@@ -718,24 +742,28 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
             if resp.status_code == 200:
                 d = resp.json()
                 photos = d.get("photos", [])
-                biz_name = d.get("displayName", {}).get("text", "")
-                app.logger.info(f"Place Details OK: {biz_name} / {len(photos)}枚")
+                fetched_name = d.get("displayName", {}).get("text", "")
+                # Place ID直接取得は信頼性が高いのでそのまま使用
+                verified_place_id = place_id
+                app.logger.info(f"Place Details OK: {fetched_name} / {len(photos)}枚")
             else:
                 app.logger.warning(f"Place Details {resp.status_code}, フォールバック")
         except Exception as e:
             app.logger.warning(f"Place Details失敗: {e}, フォールバック")
 
-    # ルート2: テキスト検索（位置情報付き）
+    # ルート2: テキスト検索（locationRestriction で厳密に絞る、radius 50m）
     if not photos:
         if not query:
             query = extract_business_name_from_url(url) or "restaurant"
         app.logger.info(f"Places APIテキスト検索: query={query} lat={lat} lng={lng}")
-        search_body = {"textQuery": query, "pageSize": 1}
+        search_body = {"textQuery": query, "pageSize": 3}
         if lat and lng:
-            search_body["locationBias"] = {
-                "circle": {
-                    "center": {"latitude": lat, "longitude": lng},
-                    "radius": 300.0
+            # locationRestriction（厳密な範囲制限）を使用 - 50m四方
+            delta = 0.00045  # 約50m
+            search_body["locationRestriction"] = {
+                "rectangle": {
+                    "low": {"latitude": lat - delta, "longitude": lng - delta},
+                    "high": {"latitude": lat + delta, "longitude": lng + delta},
                 }
             }
         try:
@@ -751,13 +779,25 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
             )
             resp.raise_for_status()
             places = resp.json().get("places", [])
-            if places:
-                photos = places[0].get("photos", [])
-                biz_name = places[0].get("displayName", {}).get("text", "")
-                app.logger.info(f"Text Search OK: {biz_name} / {len(photos)}枚")
+            # ビジネス名検証: URLのビジネス名と一致する候補を選択
+            best_place = None
+            for p in places:
+                p_name = p.get("displayName", {}).get("text", "")
+                if _fuzzy_name_match(url_business_name, p_name):
+                    best_place = p
+                    break
+            if not best_place and places:
+                # 一致する候補がなければ先頭（ただし警告）
+                app.logger.warning(f"名前不一致: URL={url_business_name}, 結果={[p.get('displayName',{}).get('text','') for p in places]}")
+                best_place = places[0]
+            if best_place:
+                photos = best_place.get("photos", [])
+                fetched_name = best_place.get("displayName", {}).get("text", "")
+                verified_place_id = best_place.get("id")
+                app.logger.info(f"Text Search OK: {fetched_name} / {len(photos)}枚 (place_id={verified_place_id})")
         except Exception as e:
             app.logger.error(f"Places API text search error: {e}")
-            return []
+            return [], None
 
     photo_urls = []
     for photo in photos[:max_photos]:
@@ -767,7 +807,7 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> list:
                 f"https://places.googleapis.com/v1/{name}/media"
                 f"?maxWidthPx=1280&maxHeightPx=720&key={GOOGLE_PLACES_API_KEY}&skipHttpRedirect=false"
             )
-    return photo_urls
+    return photo_urls, verified_place_id
 
 
 def _REMOVED_playwright_scrape(url: str, max_photos: int = 12) -> list:
@@ -1017,8 +1057,9 @@ def run_video_job(job_id: str, url: str, sparkle: bool = False):
         VIDEO_JOBS[job_id]["status"] = "scraping"
         VIDEO_JOBS[job_id]["progress"] = 10
 
-        # 1. 写真URLを取得
-        photo_urls = scrape_gbp_photos(url, max_photos=12)
+        # 1. 写真URLを取得（verified_place_idも取得して保存）
+        photo_urls, verified_place_id = scrape_gbp_photos(url, max_photos=12)
+        VIDEO_JOBS[job_id]["verified_place_id"] = verified_place_id
 
         if not photo_urls:
             VIDEO_JOBS[job_id]["status"] = "error"
@@ -1432,6 +1473,211 @@ td{{padding:.75rem 1rem;border-top:1px solid #F1F3F4;font-size:.9rem}}
         html += f'<tr><td>{rid}</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{bname or "-"}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
     html += "</table></body></html>"
     return html
+
+
+# ===== 90日アクションプラン API =====
+@app.route("/api/action-plan", methods=["POST"])
+@limiter.limit("3 per minute;10 per hour")
+def action_plan():
+    """GBP分析結果から90日間アクションプランを生成"""
+    data = request.get_json()
+    gbp_result = data.get("gbp_result")
+    if not gbp_result:
+        return jsonify({"error": "GBP分析結果が必要です"}), 400
+
+    prompt = f"""あなたはGoogleビジネスプロフィール（GBP）とローカルSEOの専門家です。
+以下のGBP診断結果を踏まえて、90日間の具体的な週次アクションプランをJSON形式で生成してください。
+
+## GBP診断結果
+ビジネス名: {gbp_result.get('business_name', '不明')}
+総合スコア: {gbp_result.get('overall_score', 0)}/100 (グレード: {gbp_result.get('grade', '-')})
+サマリー: {gbp_result.get('summary', '')}
+
+カテゴリ別:
+{json.dumps(gbp_result.get('categories', {}), ensure_ascii=False, indent=2)}
+
+## 出力形式（必ずこのJSON形式のみで回答）
+{{
+  "weeks": [
+    {{ "week": "1-2週目", "theme": "基盤整備", "tasks": ["具体的タスク1", "具体的タスク2", "具体的タスク3"], "priority": "high" }},
+    {{ "week": "3-4週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "high" }},
+    {{ "week": "5-6週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "medium" }},
+    {{ "week": "7-8週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "medium" }},
+    {{ "week": "9-10週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "low" }},
+    {{ "week": "11-12週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "low" }}
+  ],
+  "quick_wins": ["今日すぐできること1", "今日すぐできること2", "今日すぐできること3"],
+  "kpis": ["90日後の目標指標1", "90日後の目標指標2", "90日後の目標指標3"]
+}}
+
+## ルール
+- 診断結果のスコアが低いカテゴリを優先的に改善するプランにすること
+- 各タスクは「〜する」「〜を投稿する」のように具体的な動作にすること
+- 1-4週目=基盤整備（priority: high）、5-8週目=成長施策（priority: medium）、9-12週目=最適化（priority: low）
+- quick_winsは今日30分以内にできることを3つ
+- kpisは90日後に達成すべき具体的な数値目標を3つ
+"""
+    try:
+        result = call_gemini(prompt)
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"action-plan error: {e}")
+        return jsonify({"error": "アクションプランの生成に失敗しました"}), 500
+
+
+# ===== 競合分析 API =====
+@app.route("/api/competitor-analysis", methods=["POST"])
+@limiter.limit("3 per minute;10 per hour")
+def competitor_analysis():
+    """近隣競合のGBP情報を取得して比較分析"""
+    data = request.get_json()
+    url = data.get("url", "").strip()
+    business_name = data.get("business_name", "").strip()
+    category = data.get("category", "").strip()
+
+    if not business_name:
+        return jsonify({"error": "ビジネス名が必要です"}), 400
+    if not GOOGLE_PLACES_API_KEY:
+        return jsonify({"error": "Places APIキーが未設定です"}), 500
+
+    # URLから座標を取得
+    resolved = resolve_url(url) if url else ""
+    _, _, lat, lng = get_query_from_url(resolved) if resolved else (None, "", None, None)
+
+    # テキスト検索で近隣の同業種を取得
+    search_query = category if category else business_name
+    search_body = {"textQuery": search_query, "pageSize": 5}
+    if lat and lng:
+        delta = 0.009  # 約1km
+        search_body["locationRestriction"] = {
+            "rectangle": {
+                "low": {"latitude": lat - delta, "longitude": lng - delta},
+                "high": {"latitude": lat + delta, "longitude": lng + delta},
+            }
+        }
+
+    try:
+        resp = requests.post(
+            "https://places.googleapis.com/v1/places:searchText",
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.rating,places.userRatingCount,places.photos",
+            },
+            json=search_body,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        places = resp.json().get("places", [])
+    except Exception as e:
+        app.logger.error(f"competitor search error: {e}")
+        return jsonify({"error": "競合検索に失敗しました"}), 500
+
+    # 自分を除外して3件まで
+    competitors = []
+    for p in places:
+        p_name = p.get("displayName", {}).get("text", "")
+        if _fuzzy_name_match(business_name, p_name, threshold=0.8):
+            continue  # 自分自身をスキップ
+        competitors.append({
+            "name": p_name,
+            "rating": p.get("rating", 0),
+            "review_count": p.get("userRatingCount", 0),
+            "photo_count": len(p.get("photos", [])),
+        })
+        if len(competitors) >= 3:
+            break
+
+    if not competitors:
+        return jsonify({"error": "近隣に競合が見つかりませんでした"}), 404
+
+    # Geminiで競合分析
+    prompt = f"""あなたはGBPとローカルSEOの専門家です。以下のビジネスと競合データを分析してください。
+
+## 自店舗
+ビジネス名: {business_name}
+
+## 競合データ
+{json.dumps(competitors, ensure_ascii=False, indent=2)}
+
+必ず以下のJSON形式のみで回答してください:
+{{
+  "competitors": [
+    {{
+      "name": "競合名",
+      "rating": 4.2,
+      "review_count": 150,
+      "photo_count": 10,
+      "estimated_score": 75,
+      "strength": "この競合の強み（1文）"
+    }}
+  ],
+  "positioning": "競合と比較した自店舗のポジショニング分析（2-3文）",
+  "recommendations": ["競合に勝つための具体的アクション1", "アクション2", "アクション3"]
+}}
+
+estimated_scoreは評価・口コミ数・写真数から推定したGBP充実度（0-100）。
+"""
+    try:
+        analysis = call_gemini(prompt)
+        return jsonify(analysis)
+    except Exception as e:
+        app.logger.error(f"competitor analysis gemini error: {e}")
+        return jsonify({"error": "競合分析の生成に失敗しました"}), 500
+
+
+# ===== AIチャット API =====
+@app.route("/api/chat", methods=["POST"])
+@limiter.limit("10 per minute;50 per hour")
+def chat():
+    """GBP分析結果を踏まえたAIチャット"""
+    data = request.get_json()
+    message = data.get("message", "").strip()
+    context = data.get("context", {})
+    history = data.get("history", [])
+
+    if not message:
+        return jsonify({"error": "メッセージが必要です"}), 400
+
+    # コンテキスト構築
+    context_text = ""
+    if context:
+        context_text = f"""
+## 診断結果コンテキスト
+ビジネス名: {context.get('business_name', '不明')}
+総合スコア: {context.get('overall_score', '不明')}/100
+グレード: {context.get('grade', '不明')}
+サマリー: {context.get('summary', '')}
+カテゴリ別スコア: {json.dumps({k: v.get('score', 0) for k, v in context.get('categories', {}).items()}, ensure_ascii=False)}
+"""
+
+    # 会話履歴（直近10件まで）
+    history_text = ""
+    for h in history[-10:]:
+        role = "ユーザー" if h.get("role") == "user" else "アシスタント"
+        history_text += f"\n{role}: {h.get('content', '')}"
+
+    prompt = f"""あなたはGoogleビジネスプロフィール(GBP)とローカルSEOの専門家アシスタントです。
+以下の診断結果を踏まえて質問に答えてください。回答は日本語で、具体的かつ実践的にしてください。
+{context_text}
+
+## 会話履歴{history_text}
+
+## ユーザーの質問
+{message}
+
+重要: 回答は必ず以下のJSON形式で返してください:
+{{
+  "reply": "あなたの回答テキスト（改行は\\nで表現）"
+}}
+"""
+    try:
+        result = call_gemini(prompt)
+        reply = result.get("reply", "申し訳ありません、回答を生成できませんでした。")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        app.logger.error(f"chat error: {e}")
+        return jsonify({"error": "チャット応答の生成に失敗しました"}), 500
 
 
 @app.errorhandler(429)
