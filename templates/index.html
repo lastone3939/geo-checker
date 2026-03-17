@@ -1552,13 +1552,16 @@ function startVideoWithStyle(style) {
 }
 
 async function startVideoGeneration(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   const url = normalizeGbpUrl(document.getElementById("videoUrlInput").value);
   if (!url) return;
 
   document.getElementById("videoProgressArea").style.display = "block";
   document.getElementById("videoResultArea").style.display = "none";
-  document.getElementById("videoSubmitBtn").disabled = true;
+  const btnNormal = document.getElementById("btnNormal");
+  const btnSparkle = document.getElementById("btnSparkle");
+  if (btnNormal) btnNormal.disabled = true;
+  if (btnSparkle) btnSparkle.disabled = true;
   document.getElementById("videoProgressBar").style.width = "10%";
   document.getElementById("videoProgressText").textContent = "写真を収集中...";
 
@@ -1566,7 +1569,7 @@ async function startVideoGeneration(e) {
     const res = await fetch("/api/create-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url, sparkle: selectedVideoStyle === 'sparkle' })
     });
     const data = await res.json();
     if (data.error) { alert(data.error); resetVideoProgress(); return; }
@@ -1601,7 +1604,10 @@ async function pollVideoProgress(jobId) {
         document.getElementById("videoProgressArea").style.display = "none";
         document.getElementById("videoResultArea").style.display = "block";
         document.getElementById("videoPhotoCount").textContent = `${data.photo_count || 0}枚の写真でスライドショー動画を生成しました`;
-        document.getElementById("videoSubmitBtn").disabled = false;
+        const btnNorm = document.getElementById("btnNormal");
+  const btnSpark = document.getElementById("btnSparkle");
+  if (btnNorm) btnNorm.disabled = false;
+  if (btnSpark) btnSpark.disabled = false;
         return;
       }
       if (data.status === "error") {
@@ -1626,7 +1632,10 @@ async function pollVideoProgress(jobId) {
 function resetVideoProgress() {
   document.getElementById("videoProgressArea").style.display = "none";
   document.getElementById("videoProgressBar").style.width = "0%";
-  document.getElementById("videoSubmitBtn").disabled = false;
+  const btnNorm = document.getElementById("btnNormal");
+  const btnSpark = document.getElementById("btnSparkle");
+  if (btnNorm) btnNorm.disabled = false;
+  if (btnSpark) btnSpark.disabled = false;
 }
 
 function resetVideoForm() {
@@ -2091,32 +2100,6 @@ function showVideoSection(gbpUrl) {
   document.getElementById("video-progress").style.display = "none";
   document.getElementById("video-done").style.display = "none";
   document.getElementById("video-error").style.display = "none";
-}
-
-async function startVideoGeneration(sparkle) {
-  const btnNormal = document.getElementById("btn-normal");
-  const btnSparkle = document.getElementById("btn-sparkle");
-  if (btnNormal) btnNormal.disabled = true;
-  if (btnSparkle) btnSparkle.disabled = true;
-  document.getElementById("video-progress").style.display = "block";
-  document.getElementById("video-done").style.display = "none";
-  document.getElementById("video-error").style.display = "none";
-  updateProgressBar(5, "写真を取得中...");
-  try {
-    const res = await fetch("/api/create-video", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: currentGbpUrl, sparkle: !!sparkle })
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) { showVideoError(data.error || "動画生成の開始に失敗しました"); return; }
-    currentVideoJobId = data.job_id;
-    pollVideoStatus();
-  } catch (e) { showVideoError("通信エラーが発生しました"); }
-  finally {
-    if (btnNormal) btnNormal.disabled = false;
-    if (btnSparkle) btnSparkle.disabled = false;
-  }
 }
 
 function pollVideoStatus() {
