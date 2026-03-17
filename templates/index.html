@@ -105,6 +105,11 @@
       flex-shrink: 0;
       animation: float 3s ease-in-out infinite;
     }
+    @keyframes petFloat {
+      0%,100% { transform: translateY(0px) rotate(0deg); }
+      25% { transform: translateY(-6px) rotate(1deg); }
+      75% { transform: translateY(-3px) rotate(-1deg); }
+    }
     @keyframes float {
       0%,100% { transform: translateY(0); }
       50% { transform: translateY(-8px); }
@@ -957,17 +962,76 @@
       <div style="max-width:900px;margin:0 auto;padding:0 24px;">
         <div class="feature-cards">
           <div class="feat-card">
-            <div class="feat-icon">⚡</div>
+            <div class="feat-icon">
+              <!-- Kenney Cube Pets風 ネコ（青） -->
+              <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="animation:petFloat 3s ease-in-out infinite;">
+                <rect x="12" y="24" width="40" height="32" rx="7" fill="#1A73E8"/>
+                <rect x="14" y="6" width="36" height="28" rx="7" fill="#1A73E8"/>
+                <polygon points="14,12 6,2 22,6" fill="#1A73E8"/>
+                <polygon points="50,12 58,2 42,6" fill="#1A73E8"/>
+                <polygon points="14,11 8,3 20,7" fill="#5B9CF6"/>
+                <polygon points="50,11 56,3 44,7" fill="#5B9CF6"/>
+                <circle cx="24" cy="19" r="4" fill="white"/>
+                <circle cx="40" cy="19" r="4" fill="white"/>
+                <circle cx="25" cy="20" r="2.5" fill="#1A1A2E"/>
+                <circle cx="41" cy="20" r="2.5" fill="#1A1A2E"/>
+                <ellipse cx="32" cy="26" rx="2.5" ry="1.8" fill="#FF8FAB"/>
+                <path d="M29.5 29 Q32 32 34.5 29" stroke="#1A1A2E" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                <path d="M52 48 Q62 40 58 30" stroke="#1565C0" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <rect x="16" y="51" width="13" height="10" rx="5" fill="#1565C0"/>
+                <rect x="35" y="51" width="13" height="10" rx="5" fill="#1565C0"/>
+              </svg>
+            </div>
             <h3>30秒で診断完了</h3>
             <p>登録不要・URLを貼るだけ。<br>面倒な設定は一切なし。</p>
           </div>
           <div class="feat-card">
-            <div class="feat-icon">🤖</div>
+            <div class="feat-icon">
+              <!-- Kenney Cube Pets風 イヌ（緑） -->
+              <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="animation:petFloat 3s ease-in-out infinite;animation-delay:0.8s;">
+                <rect x="12" y="24" width="40" height="32" rx="7" fill="#34A853"/>
+                <rect x="14" y="6" width="36" height="28" rx="7" fill="#34A853"/>
+                <!-- たれ耳 -->
+                <rect x="6" y="4" width="12" height="20" rx="6" fill="#2D9249"/>
+                <rect x="46" y="4" width="12" height="20" rx="6" fill="#2D9249"/>
+                <circle cx="24" cy="19" r="4" fill="white"/>
+                <circle cx="40" cy="19" r="4" fill="white"/>
+                <circle cx="25" cy="20" r="2.5" fill="#1A1A2E"/>
+                <circle cx="41" cy="20" r="2.5" fill="#1A1A2E"/>
+                <ellipse cx="32" cy="25" rx="5" ry="3.5" fill="#2D9249"/>
+                <ellipse cx="32" cy="26" rx="2.5" ry="1.8" fill="#A8D5B5"/>
+                <path d="M29.5 29 Q32 32 34.5 29" stroke="#1A1A2E" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                <path d="M52 44 Q60 36 56 26" stroke="#2D9249" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <rect x="16" y="51" width="13" height="10" rx="5" fill="#2D9249"/>
+                <rect x="35" y="51" width="13" height="10" rx="5" fill="#2D9249"/>
+              </svg>
+            </div>
             <h3>AIが具体的に改善案を提示</h3>
             <p>曖昧なアドバイスではなく、<br>今日から実行可能なアクション。</p>
           </div>
           <div class="feat-card">
-            <div class="feat-icon">📈</div>
+            <div class="feat-icon">
+              <!-- Kenney Cube Pets風 ウサギ（オレンジ） -->
+              <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="animation:petFloat 3s ease-in-out infinite;animation-delay:1.6s;">
+                <rect x="12" y="24" width="40" height="32" rx="7" fill="#F57C00"/>
+                <rect x="14" y="6" width="36" height="28" rx="7" fill="#F57C00"/>
+                <!-- 長い耳 -->
+                <rect x="16" y="0" width="10" height="22" rx="5" fill="#F57C00"/>
+                <rect x="38" y="0" width="10" height="22" rx="5" fill="#F57C00"/>
+                <rect x="18" y="2" width="6" height="16" rx="3" fill="#FFCC80"/>
+                <rect x="40" y="2" width="6" height="16" rx="3" fill="#FFCC80"/>
+                <circle cx="24" cy="19" r="4" fill="white"/>
+                <circle cx="40" cy="19" r="4" fill="white"/>
+                <circle cx="25" cy="20" r="2.5" fill="#1A1A2E"/>
+                <circle cx="41" cy="20" r="2.5" fill="#1A1A2E"/>
+                <ellipse cx="32" cy="26" rx="2.5" ry="1.8" fill="#FF8FAB"/>
+                <path d="M29.5 29 Q32 32 34.5 29" stroke="#1A1A2E" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                <!-- 丸いしっぽ -->
+                <circle cx="54" cy="44" r="7" fill="#FFE0B2"/>
+                <rect x="16" y="51" width="13" height="10" rx="5" fill="#E65100"/>
+                <rect x="35" y="51" width="13" height="10" rx="5" fill="#E65100"/>
+              </svg>
+            </div>
             <h3>Ask Maps（AI検索）にも対応</h3>
             <p>2026年夏のGoogle AI検索に<br>先手を打つ準備を。</p>
           </div>
