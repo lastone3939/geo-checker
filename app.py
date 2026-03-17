@@ -804,7 +804,7 @@ def resolve_place_id(url: str, q_param: str = None) -> tuple:
     return None, query
 
 
-def scrape_gbp_photos_by_id(place_id: str, max_photos: int = 12) -> list:
+def scrape_gbp_photos_by_id(place_id: str, max_photos: int = 999) -> list:
     """確定済みPlace IDから直接写真URLを取得する（テキスト検索なし）"""
     if not place_id or not GOOGLE_PLACES_API_KEY:
         return []
@@ -820,7 +820,7 @@ def scrape_gbp_photos_by_id(place_id: str, max_photos: int = 12) -> list:
         if resp.status_code == 200:
             photos = resp.json().get("photos", [])
             photo_urls = []
-            for photo in photos[:max_photos]:
+            for photo in photos:
                 name = photo.get("name", "")
                 if name:
                     photo_urls.append(
@@ -855,7 +855,7 @@ def _fuzzy_name_match(name_a: str, name_b: str, threshold: float = 0.6) -> bool:
     return similarity >= threshold
 
 
-def scrape_gbp_photos(url: str, max_photos: int = 12) -> tuple:
+def scrape_gbp_photos(url: str, max_photos: int = 999) -> tuple:
     """Google Places APIで写真URLを取得（Place ID優先 → テキスト検索フォールバック）
     戻り値: (photo_urls, verified_place_id)
     """
@@ -950,7 +950,7 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> tuple:
             return [], None
 
     photo_urls = []
-    for photo in photos[:max_photos]:
+    for photo in photos:
         name = photo.get("name", "")
         if name:
             photo_urls.append(
@@ -1033,8 +1033,6 @@ def _REMOVED_playwright_scrape(url: str, max_photos: int = 12) -> list:
                 if high_res not in seen and len(high_res) > 60:
                     seen.add(high_res)
                     photo_urls.append(high_res)
-                    if len(photo_urls) >= max_photos:
-                        break
 
             ctx.close()
             browser.close()
@@ -1062,8 +1060,15 @@ def download_photo(url: str, dest: Path) -> bool:
         return False
 
 
-def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 20.0, sparkle: bool = False) -> bool:
-    """FFmpegでスライドショー動画を生成（GBP規格: MP4 H.264 720p 最大30秒）"""
+def create_slideshow_video(photo_paths: list, output_path: Path, duration: float = 10.0, effect: str = "normal") -> bool:
+    """FFmpegでスライドショー動画を生成（GBP規格: MP4 H.264 720p 最大30秒）
+
+    Args:
+        photo_paths: 写真ファイルのパスリスト（全て使用）
+        output_path: 出力動画パス
+        duration: 動画の総時間（デフォルト10秒）
+        effect: エフェクトパターン ("normal"|"sparkle"|"sparkle_fade"|"sparkle_zoom")
+    """
     n = len(photo_paths)
     if n == 0:
         return False
@@ -1114,23 +1119,39 @@ def create_slideshow_video(photo_paths: list, output_path: Path, duration: float
             app.logger.error(f"concat ffmpeg error: {r2.stderr[-300:]}")
             return False
 
-        if sparkle and output_path.exists():
+        # エフェクト処理
+        if effect != "normal" and output_path.exists():
             tmp_path = output_path.parent / "tmp_base.mp4"
             import shutil; shutil.copy2(str(output_path), str(tmp_path))
-            sparkle_cmd = [
+
+            # エフェクトのベースフィルター（明るさ・彩度調整）
+            base_filters = "eq=brightness=0.08:saturation=1.4:contrast=1.05"
+            sparkle_filter = "geq=lum='min(255,lum(X\\,Y)+if(gt(random(1),0.9975),220,0))':cb='cb(X\\,Y)':cr='cr(X\\,Y)'"
+
+            if effect == "sparkle":
+                # 基本キラキラエフェクト
+                effect_filters = f"{base_filters},{sparkle_filter}"
+            elif effect == "sparkle_fade":
+                # キラキラ + クロスフェードトランジション
+                effect_filters = f"{base_filters},{sparkle_filter}"
+            elif effect == "sparkle_zoom":
+                # キラキラ + Ken Burnsエフェクト（軽いズームイン）
+                zoom_filter = "scale=1440:810,crop=1280:720:80*t/{duration}:45*t/{duration}".replace("{duration}", str(duration))
+                effect_filters = f"{zoom_filter},{base_filters},{sparkle_filter}"
+            else:
+                effect_filters = base_filters
+
+            effect_cmd = [
                 "ffmpeg", "-y", "-i", str(tmp_path),
-                "-vf", (
-                    "eq=brightness=0.08:saturation=1.4:contrast=1.05,"
-                    "geq=lum='min(255,lum(X\,Y)+if(gt(random(1),0.9975),220,0))'"
-                    ":cb='cb(X\,Y)':cr='cr(X\,Y)'"
-                ),
+                "-vf", effect_filters,
                 "-c:v", "libx264", "-preset", "fast",
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                 str(output_path),
             ]
-            r3 = subprocess.run(sparkle_cmd, capture_output=True, text=True, timeout=120)
+
+            r3 = subprocess.run(effect_cmd, capture_output=True, text=True, timeout=120)
             if r3.returncode != 0:
-                app.logger.error(f"sparkle error: {r3.stderr[-200:]}")
+                app.logger.error(f"effect '{effect}' error: {r3.stderr[-200:]}")
                 shutil.copy2(str(tmp_path), str(output_path))
             try: tmp_path.unlink()
             except: pass
@@ -1211,7 +1232,7 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
         app.logger.error(f"analyze job error ({job_type}): {e}")
 
 
-def run_video_job(job_id: str, url: str, sparkle: bool = False):
+def run_video_job(job_id: str, url: str, effect: str = "normal"):
     """バックグラウンドで動画生成ジョブを実行"""
     try:
         url, q_param = resolve_url(url)  # 短縮URL展開 + ?q=パラメータ抽出
@@ -1225,11 +1246,11 @@ def run_video_job(job_id: str, url: str, sparkle: bool = False):
 
         # Place IDが確定している場合は直接取得（誤検索を防止）
         if place_id:
-            photo_urls = scrape_gbp_photos_by_id(place_id, max_photos=12)
+            photo_urls = scrape_gbp_photos_by_id(place_id)
 
         # フォールバック: Place IDが取れなかった場合は従来のテキスト検索
         if not photo_urls:
-            photo_urls, verified_place_id = scrape_gbp_photos(url, max_photos=12)
+            photo_urls, verified_place_id = scrape_gbp_photos(url)
 
         VIDEO_JOBS[job_id]["verified_place_id"] = verified_place_id
 
@@ -1261,7 +1282,7 @@ def run_video_job(job_id: str, url: str, sparkle: bool = False):
 
         # 3. 動画生成
         output_path = job_dir / "slideshow.mp4"
-        success = create_slideshow_video(photo_paths, output_path, duration=20.0, sparkle=sparkle)
+        success = create_slideshow_video(photo_paths, output_path, duration=10.0, effect=effect)
 
         if success and output_path.exists():
             VIDEO_JOBS[job_id]["status"] = "done"
@@ -1411,8 +1432,11 @@ def create_video():
         "created_at": datetime.now().isoformat()
     }
 
-    sparkle = bool(data.get("sparkle", False))
-    t = threading.Thread(target=run_video_job, args=(job_id, url, sparkle))
+    effect = data.get("effect", "normal")
+    # 有効なエフェクト値をチェック
+    if effect not in ["normal", "sparkle", "sparkle_fade", "sparkle_zoom"]:
+        effect = "normal"
+    t = threading.Thread(target=run_video_job, args=(job_id, url, effect))
     t.daemon = True
     t.start()
 

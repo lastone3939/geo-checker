@@ -806,6 +806,45 @@
               <button type="submit" id="webSubmitBtn" class="submit-btn">診断スタート</button>
             </form>
             <p class="url-hint">ChatGPT・Claude・Perplexity への最適化スコアを診断</p>
+
+            <!-- サンプル診断結果 -->
+            <div style="margin-top:24px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;">📊 サンプル診断結果</p>
+
+              <!-- サンプルサイトの診断結果 -->
+              <div style="background:white;border-radius:8px;padding:14px;border:1px solid #e1e5e9;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <div style="font-size:13px;font-weight:600;color:#333;">zettai.co.jp</div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="background:#d93025;color:white;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;">D</div>
+                    <div style="font-size:14px;font-weight:700;color:#d93025;">51点</div>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;">
+                  <div style="text-align:center;padding:8px;background:#fef7e0;border-radius:6px;">
+                    <div style="font-size:18px;margin-bottom:4px;">🤖</div>
+                    <div style="font-size:11px;font-weight:600;color:#f59e0b;">ChatGPT</div>
+                    <div style="font-size:13px;font-weight:700;color:#f59e0b;">62点</div>
+                  </div>
+                  <div style="text-align:center;padding:8px;background:#fee2e2;border-radius:6px;">
+                    <div style="font-size:18px;margin-bottom:4px;">🎯</div>
+                    <div style="font-size:11px;font-weight:600;color:#dc2626;">Claude</div>
+                    <div style="font-size:13px;font-weight:700;color:#dc2626;">38点</div>
+                  </div>
+                  <div style="text-align:center;padding:8px;background:#fef3c7;border-radius:6px;">
+                    <div style="font-size:18px;margin-bottom:4px;">🔍</div>
+                    <div style="font-size:11px;font-weight:600;color:#d97706;">Perplexity</div>
+                    <div style="font-size:13px;font-weight:700;color:#d97706;">53点</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ AI検索対応</span>
+                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 詳細レポート</span>
+                <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 改善提案</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -816,6 +855,60 @@
               <button type="submit" id="gbpSubmitBtn" class="submit-btn gbp-btn">診断スタート</button>
             </form>
             <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>g.page</code></p>
+
+            <!-- サンプルGBP診断結果 -->
+            <div style="margin-top:24px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;">📍 サンプル診断結果</p>
+
+              <!-- サンプルGBPの診断結果 -->
+              <div style="background:white;border-radius:8px;padding:14px;border:1px solid #e1e5e9;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <div style="font-size:13px;font-weight:600;color:#333;">渋谷カフェ（サンプル店舗）</div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="background:#34a853;color:white;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;">B</div>
+                    <div style="font-size:14px;font-weight:700;color:#34a853;">76点</div>
+                  </div>
+                </div>
+
+                <!-- カテゴリ別スコア -->
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
+                    <div style="font-size:16px;">📋</div>
+                    <div>
+                      <div style="font-size:11px;font-weight:600;color:#2d7d46;">プロフィール完成度</div>
+                      <div style="font-size:13px;font-weight:700;color:#34a853;">85点</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fef7e0;border-radius:6px;">
+                    <div style="font-size:16px;">📸</div>
+                    <div>
+                      <div style="font-size:11px;font-weight:600;color:#b45309;">写真・動画</div>
+                      <div style="font-size:13px;font-weight:700;color:#f59e0b;">72点</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
+                    <div style="font-size:16px;">⭐</div>
+                    <div>
+                      <div style="font-size:11px;font-weight:600;color:#2d7d46;">クチコミ管理</div>
+                      <div style="font-size:13px;font-weight:700;color:#34a853;">81点</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fef3c7;border-radius:6px;">
+                    <div style="font-size:16px;">🎯</div>
+                    <div>
+                      <div style="font-size:11px;font-weight:600;color:#b45309;">ローカルSEO</div>
+                      <div style="font-size:13px;font-weight:700;color:#d97706;">68点</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 6項目診断</span>
+                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 改善提案</span>
+                <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 競合分析</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -857,49 +950,61 @@
             <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code></p>
 
             <!-- スタイル選択ボタン -->
-            <div style="display:flex;gap:10px;margin-top:16px;">
-              <button type="button" id="btnNormal" onclick="startVideoWithStyle('normal')" style="flex:1;padding:14px 16px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-                🎬 ノーマル動画
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;">
+              <button type="button" id="btnNormal" onclick="startVideoWithStyle('normal')" style="padding:12px 14px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+                🎬 ノーマル
               </button>
-              <button type="button" id="btnSparkle" onclick="startVideoWithStyle('sparkle')" style="flex:1;padding:14px 16px;background:linear-gradient(135deg,#FF6B9D,#C44AFF);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-                ✨ キラキラ動画
+              <button type="button" id="btnSparkle" onclick="startVideoWithStyle('sparkle')" style="padding:12px 14px;background:linear-gradient(135deg,#FF6B9D,#C44AFF);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+                ✨ キラキラ
+              </button>
+              <button type="button" id="btnSparkleFade" onclick="startVideoWithStyle('sparkle_fade')" style="padding:12px 14px;background:linear-gradient(135deg,#FFB347,#FFCC02);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+                🌟 キラ+フェード
+              </button>
+              <button type="button" id="btnSparkleZoom" onclick="startVideoWithStyle('sparkle_zoom')" style="padding:12px 14px;background:linear-gradient(135deg,#9D50BB,#6F42C1);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+                🔍 キラ+ズーム
               </button>
             </div>
 
             <!-- サンプル動画セクション -->
             <div style="margin-top:20px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
-              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">📽️ こんな動画が生成されます</p>
-              
-              <!-- ノーマル vs キラキラ比較 -->
-              <div style="display:flex;gap:10px;">
-                <!-- ノーマルサンプル -->
-                <div style="flex:1;">
-                  <div style="background:#2C3E50;border-radius:8px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
-                    <div style="text-align:center;color:white;z-index:1;">
-                      <div style="font-size:28px;margin-bottom:6px;">🏪</div>
-                      <div style="font-size:11px;font-weight:600;">ノーマル</div>
-                    </div>
-                    <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:white;font-size:10px;padding:2px 6px;border-radius:3px;">10秒</div>
-                  </div>
-                  <p style="text-align:center;font-size:11px;color:var(--text-sub);margin-top:6px;">シンプルで見やすい</p>
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">📽️ サンプル動画（このような動画が作れます）</p>
+
+              <!-- 実際のサンプル動画 -->
+              <div style="display:flex;justify-content:center;margin-bottom:12px;">
+                <video
+                  controls
+                  preload="metadata"
+                  style="width:200px;height:356px;border-radius:8px;background:#000;"
+                  poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='356' viewBox='0 0 200 356'%3E%3Crect width='200' height='356' fill='%23f8f9fa'/%3E%3Ctext x='100' y='178' text-anchor='middle' font-size='40'%3E🏪%3C/text%3E%3C/svg%3E"
+                >
+                  <source src="/api/video-download/93077c96-49b3-4beb-836f-932d54989a7f" type="video/mp4">
+                  お使いのブラウザでは動画を再生できません。
+                </video>
+              </div>
+
+              <!-- エフェクト種類の説明 -->
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">
+                <div style="text-align:center;padding:8px;background:white;border-radius:6px;border:1px solid #e1e5e9;">
+                  <div style="font-size:18px;margin-bottom:2px;">🎬</div>
+                  <div style="font-size:11px;font-weight:600;color:#1a73e8;">ノーマル</div>
                 </div>
-                <!-- キラキラサンプル -->
-                <div style="flex:1;">
-                  <div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:8px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
-                    <div style="position:absolute;inset:0;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50" font-size="20">✨</text></svg>') repeat;opacity:0.3;"></div>
-                    <div style="text-align:center;color:white;z-index:1;">
-                      <div style="font-size:28px;margin-bottom:6px;">✨</div>
-                      <div style="font-size:11px;font-weight:600;">キラキラ</div>
-                    </div>
-                    <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:white;font-size:10px;padding:2px 6px;border-radius:3px;">10秒</div>
-                  </div>
-                  <p style="text-align:center;font-size:11px;color:var(--text-sub);margin-top:6px;">エフェクト付きで華やか</p>
+                <div style="text-align:center;padding:8px;background:linear-gradient(135deg,#ff6b9d,#c44aff);color:white;border-radius:6px;">
+                  <div style="font-size:18px;margin-bottom:2px;">✨</div>
+                  <div style="font-size:11px;font-weight:600;">キラキラ</div>
+                </div>
+                <div style="text-align:center;padding:8px;background:linear-gradient(135deg,#ffb347,#ffcc02);color:white;border-radius:6px;">
+                  <div style="font-size:18px;margin-bottom:2px;">🌟</div>
+                  <div style="font-size:11px;font-weight:600;">キラ+フェード</div>
+                </div>
+                <div style="text-align:center;padding:8px;background:linear-gradient(135deg,#9d50bb,#6f42c1);color:white;border-radius:6px;">
+                  <div style="font-size:18px;margin-bottom:2px;">🔍</div>
+                  <div style="font-size:11px;font-weight:600;">キラ+ズーム</div>
                 </div>
               </div>
 
-              <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
-                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 写真自動収集</span>
-                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 最大12枚</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 全写真を自動収集</span>
+                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 10秒動画</span>
                 <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ GBPにアップ可</span>
               </div>
             </div>
@@ -1544,9 +1649,23 @@ function startVideoWithStyle(style) {
     document.getElementById('videoUrlInput').focus();
     return;
   }
-  // 選択状態を視覚的に表示
-  document.getElementById('btnNormal').style.opacity = style === 'normal' ? '1' : '0.6';
-  document.getElementById('btnSparkle').style.opacity = style === 'sparkle' ? '1' : '0.6';
+  // 全ボタンの選択状態をリセット
+  const buttons = ['btnNormal', 'btnSparkle', 'btnSparkleFade', 'btnSparkleZoom'];
+  buttons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.style.opacity = '0.6';
+  });
+
+  // 選択されたボタンをハイライト
+  const selectedBtnMap = {
+    'normal': 'btnNormal',
+    'sparkle': 'btnSparkle',
+    'sparkle_fade': 'btnSparkleFade',
+    'sparkle_zoom': 'btnSparkleZoom'
+  };
+  const selectedBtn = document.getElementById(selectedBtnMap[style]);
+  if (selectedBtn) selectedBtn.style.opacity = '1';
+
   // 動画生成開始
   startVideoGeneration({ preventDefault: () => {} });
 }
@@ -1558,10 +1677,12 @@ async function startVideoGeneration(e) {
 
   document.getElementById("videoProgressArea").style.display = "block";
   document.getElementById("videoResultArea").style.display = "none";
-  const btnNormal = document.getElementById("btnNormal");
-  const btnSparkle = document.getElementById("btnSparkle");
-  if (btnNormal) btnNormal.disabled = true;
-  if (btnSparkle) btnSparkle.disabled = true;
+  // 全ボタンを無効化
+  const videoButtons = ['btnNormal', 'btnSparkle', 'btnSparkleFade', 'btnSparkleZoom'];
+  videoButtons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.disabled = true;
+  });
   document.getElementById("videoProgressBar").style.width = "10%";
   document.getElementById("videoProgressText").textContent = "写真を収集中...";
 
@@ -1569,7 +1690,7 @@ async function startVideoGeneration(e) {
     const res = await fetch("/api/create-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, sparkle: selectedVideoStyle === 'sparkle' })
+      body: JSON.stringify({ url, effect: selectedVideoStyle })
     });
     const data = await res.json();
     if (data.error) { alert(data.error); resetVideoProgress(); return; }
@@ -1604,10 +1725,12 @@ async function pollVideoProgress(jobId) {
         document.getElementById("videoProgressArea").style.display = "none";
         document.getElementById("videoResultArea").style.display = "block";
         document.getElementById("videoPhotoCount").textContent = `${data.photo_count || 0}枚の写真でスライドショー動画を生成しました`;
-        const btnNorm = document.getElementById("btnNormal");
-  const btnSpark = document.getElementById("btnSparkle");
-  if (btnNorm) btnNorm.disabled = false;
-  if (btnSpark) btnSpark.disabled = false;
+        // 全ボタンを有効化
+        const videoButtons = ['btnNormal', 'btnSparkle', 'btnSparkleFade', 'btnSparkleZoom'];
+        videoButtons.forEach(btnId => {
+          const btn = document.getElementById(btnId);
+          if (btn) btn.disabled = false;
+        });
         return;
       }
       if (data.status === "error") {
@@ -1632,10 +1755,12 @@ async function pollVideoProgress(jobId) {
 function resetVideoProgress() {
   document.getElementById("videoProgressArea").style.display = "none";
   document.getElementById("videoProgressBar").style.width = "0%";
-  const btnNorm = document.getElementById("btnNormal");
-  const btnSpark = document.getElementById("btnSparkle");
-  if (btnNorm) btnNorm.disabled = false;
-  if (btnSpark) btnSpark.disabled = false;
+  // 全ボタンを有効化
+  const videoButtons = ['btnNormal', 'btnSparkle', 'btnSparkleFade', 'btnSparkleZoom'];
+  videoButtons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.disabled = false;
+  });
 }
 
 function resetVideoForm() {
