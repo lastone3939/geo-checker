@@ -462,19 +462,27 @@ statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
-def resolve_url(url: str) -> str:
-    """短縮URLを最終URLに展開（share.google / maps.app.goo.gl 等）"""
+def resolve_url(url: str) -> tuple:
+    """短縮URLを最終URLに展開（share.google / maps.app.goo.gl 等）
+    戻り値: (final_url, extracted_query) — extracted_queryは?q=パラメータの値
+    """
+    from urllib.parse import parse_qs
     short_hosts = ["share.google", "maps.app.goo.gl", "goo.gl", "g.page"]
     parsed = urlparse(url)
     host = parsed.netloc.lower()
+    final_url = url
     if any(host == h or host.endswith("." + h) for h in short_hosts):
         try:
             r = requests.get(url, allow_redirects=True, timeout=10,
                              headers={"User-Agent": "Mozilla/5.0"})
-            return r.url
+            final_url = r.url
         except Exception:
             pass
-    return url
+    # ?q= パラメータを抽出（短縮URLリダイレクト後に「住所+店名」が入ることがある）
+    parsed_final = urlparse(final_url)
+    qs = parse_qs(parsed_final.query)
+    extracted_query = qs.get("q", [None])[0]
+    return final_url, extracted_query
 
 
 def validate_gbp_url(url):
@@ -692,6 +700,120 @@ def get_query_from_url(url: str) -> tuple:
     return place_id, query, lat, lng
 
 
+def resolve_place_id(url: str, q_param: str = None) -> tuple:
+    """URLとqパラメータからPlace IDを確実に取得する。
+    戻り値: (place_id, business_name)
+
+    優先順位:
+    1. URLの!1sChIJ... パターン (最確実)
+    2. qパラメータ (住所+店名) でPlaces API textQuery + locationRestriction
+    3. URLの/place/NAME/ + 座標 でPlaces API
+    4. 座標のみでの近傍検索 (最終手段、精度低)
+    """
+    PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+
+    # Step 1: URLからChIJ Place IDを直接抽出
+    place_id_m = re.search(r"!1s(ChIJ[A-Za-z0-9_\-]+)", url)
+    if place_id_m:
+        place_id = place_id_m.group(1)
+        try:
+            resp = requests.get(
+                f"https://places.googleapis.com/v1/places/{place_id}",
+                headers={"X-Goog-Api-Key": PLACES_KEY, "X-Goog-FieldMask": "displayName"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                name = resp.json().get("displayName", {}).get("text", "")
+                return place_id, name
+        except Exception as e:
+            app.logger.warning(f"Place Details lookup failed for {place_id}: {e}")
+
+    # 座標抽出
+    lat, lng = None, None
+    coord_m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", url)
+    if coord_m:
+        lat, lng = float(coord_m.group(1)), float(coord_m.group(2))
+    else:
+        coord_m2 = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", url)
+        if coord_m2:
+            lat, lng = float(coord_m2.group(1)), float(coord_m2.group(2))
+
+    # Step 2: qパラメータ (住所+店名) での検索 — 最も特定度が高い
+    query = q_param or ""
+    if not query:
+        # /place/NAME/ からビジネス名抽出
+        name_m = re.search(r"/place/([^/@]+)", url)
+        if name_m:
+            query = unquote(name_m.group(1)).replace("+", " ")
+
+    if query and PLACES_KEY:
+        search_body = {
+            "textQuery": query,
+            "pageSize": 1,
+            "languageCode": "ja"
+        }
+        # 座標がある場合は50m制限で厳密に絞り込む
+        if lat and lng:
+            search_body["locationRestriction"] = {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lng},
+                    "radius": 50.0
+                }
+            }
+        try:
+            resp = requests.post(
+                "https://places.googleapis.com/v1/places:searchText",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": PLACES_KEY,
+                    "X-Goog-FieldMask": "places.id,places.displayName"
+                },
+                json=search_body,
+                timeout=15
+            )
+            resp.raise_for_status()
+            places = resp.json().get("places", [])
+            if places:
+                pid = places[0]["id"]
+                name = places[0].get("displayName", {}).get("text", "")
+                app.logger.info(f"resolve_place_id: query='{query}' → {name} ({pid})")
+                return pid, name
+        except Exception as e:
+            app.logger.warning(f"resolve_place_id search failed: {e}")
+
+    return None, query
+
+
+def scrape_gbp_photos_by_id(place_id: str, max_photos: int = 12) -> list:
+    """確定済みPlace IDから直接写真URLを取得する（テキスト検索なし）"""
+    if not place_id or not GOOGLE_PLACES_API_KEY:
+        return []
+    try:
+        resp = requests.get(
+            f"https://places.googleapis.com/v1/places/{place_id}",
+            headers={
+                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                "X-Goog-FieldMask": "photos",
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            photos = resp.json().get("photos", [])
+            photo_urls = []
+            for photo in photos[:max_photos]:
+                name = photo.get("name", "")
+                if name:
+                    photo_urls.append(
+                        f"https://places.googleapis.com/v1/{name}/media"
+                        f"?maxWidthPx=1280&maxHeightPx=720&key={GOOGLE_PLACES_API_KEY}&skipHttpRedirect=false"
+                    )
+            app.logger.info(f"scrape_gbp_photos_by_id: {place_id} → {len(photo_urls)}枚")
+            return photo_urls
+    except Exception as e:
+        app.logger.warning(f"scrape_gbp_photos_by_id error: {e}")
+    return []
+
+
 def _fuzzy_name_match(name_a: str, name_b: str, threshold: float = 0.6) -> bool:
     """ビジネス名のあいまい一致判定（閾値以上で一致とみなす）"""
     if not name_a or not name_b:
@@ -722,7 +844,7 @@ def scrape_gbp_photos(url: str, max_photos: int = 12) -> tuple:
         return [], None
 
     # 短縮URL（share.google / maps.app.goo.gl）を展開
-    url = resolve_url(url)
+    url, _ = resolve_url(url)
     app.logger.info(f"resolve後URL: {url[:100]}")
 
     place_id, query, lat, lng = get_query_from_url(url)
@@ -1028,8 +1150,15 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
             ANALYZE_JOBS[job_id]["status"] = "done"
 
         elif job_type == "gbp":
-            url = resolve_url(url)  # share.google / maps.app.goo.gl を展開
-            business_name = extract_business_name_from_url(url)
+            url, q_param = resolve_url(url)  # 短縮URL展開 + ?q=パラメータ抽出
+            # Place IDを確実に解決（qパラメータ優先）
+            place_id, resolved_name = resolve_place_id(url, q_param)
+            ANALYZE_JOBS[job_id]["place_id"] = place_id
+            ANALYZE_JOBS[job_id]["q_param"] = q_param
+
+            business_name = resolved_name or extract_business_name_from_url(url)
+            ANALYZE_JOBS[job_id]["business_name"] = business_name
+
             html_snippet = fetch_gmaps_page(url)
             if html_snippet:
                 soup = BeautifulSoup(html_snippet, "html.parser")
@@ -1039,8 +1168,12 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
                         business_name = m.group(1).strip()
             result = analyze_gbp_with_gemini(url, business_name, html_snippet)
             result["analyzed_url"] = url
+            if resolved_name:
+                result["confirmed_business_name"] = resolved_name
             if not result.get("business_name") and business_name:
                 result["business_name"] = business_name
+            if place_id:
+                result["place_id"] = place_id
             log_gbp_analysis(url, result.get("business_name", business_name or "不明"),
                            result.get("overall_score"), result.get("grade"), "async")
             ANALYZE_JOBS[job_id]["result"] = result
@@ -1061,12 +1194,23 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
 def run_video_job(job_id: str, url: str, sparkle: bool = False):
     """バックグラウンドで動画生成ジョブを実行"""
     try:
-        url = resolve_url(url)  # share.google / maps.app.goo.gl を展開
+        url, q_param = resolve_url(url)  # 短縮URL展開 + ?q=パラメータ抽出
         VIDEO_JOBS[job_id]["status"] = "scraping"
         VIDEO_JOBS[job_id]["progress"] = 10
 
-        # 1. 写真URLを取得（verified_place_idも取得して保存）
-        photo_urls, verified_place_id = scrape_gbp_photos(url, max_photos=12)
+        # 1. Place IDを確実に解決してから写真を取得
+        place_id, biz_name = resolve_place_id(url, q_param)
+        photo_urls = []
+        verified_place_id = place_id
+
+        # Place IDが確定している場合は直接取得（誤検索を防止）
+        if place_id:
+            photo_urls = scrape_gbp_photos_by_id(place_id, max_photos=12)
+
+        # フォールバック: Place IDが取れなかった場合は従来のテキスト検索
+        if not photo_urls:
+            photo_urls, verified_place_id = scrape_gbp_photos(url, max_photos=12)
+
         VIDEO_JOBS[job_id]["verified_place_id"] = verified_place_id
 
         if not photo_urls:
@@ -1549,7 +1693,7 @@ def competitor_analysis():
         return jsonify({"error": "Places APIキーが未設定です"}), 500
 
     # URLから座標を取得
-    resolved = resolve_url(url) if url else ""
+    resolved, _ = resolve_url(url) if url else ("", None)
     _, _, lat, lng = get_query_from_url(resolved) if resolved else (None, "", None, None)
 
     # テキスト検索で近隣の同業種を取得
