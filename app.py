@@ -712,10 +712,29 @@ def resolve_place_id(url: str, q_param: str = None) -> tuple:
     """
     PLACES_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 
-    # Step 1: URLからChIJ Place IDを直接抽出
-    place_id_m = re.search(r"!1s(ChIJ[A-Za-z0-9_\-]+)", url)
-    if place_id_m:
-        place_id = place_id_m.group(1)
+    # Step 1: URLからChIJ Place IDを直接抽出（複数パターン対応）
+    place_id = None
+    # パターン1: !1sChIJ... (通常のGoogleマップURL)
+    m1 = re.search(r"!1s(ChIJ[A-Za-z0-9_\-]+)", url)
+    if m1:
+        place_id = m1.group(1)
+    # パターン2: place_id:ChIJ... (?qパラメータ or パスに含まれる)
+    if not place_id:
+        m2 = re.search(r"place_id[=:](ChIJ[A-Za-z0-9_\-]+)", url)
+        if m2:
+            place_id = m2.group(1)
+    # パターン3: qパラメータに place_id:ChIJ... が含まれる
+    if not place_id and q_param:
+        m3 = re.match(r"place_id:(ChIJ[A-Za-z0-9_\-]+)", q_param or "")
+        if m3:
+            place_id = m3.group(1)
+    # パターン4: URLに ChIJ が直接含まれる
+    if not place_id:
+        m4 = re.search(r"(ChIJ[A-Za-z0-9_\-]{10,})", url)
+        if m4:
+            place_id = m4.group(1)
+
+    if place_id:
         try:
             resp = requests.get(
                 f"https://places.googleapis.com/v1/places/{place_id}",
@@ -724,6 +743,7 @@ def resolve_place_id(url: str, q_param: str = None) -> tuple:
             )
             if resp.status_code == 200:
                 name = resp.json().get("displayName", {}).get("text", "")
+                app.logger.info(f"Place ID直接取得: {place_id} → {name}")
                 return place_id, name
         except Exception as e:
             app.logger.warning(f"Place Details lookup failed for {place_id}: {e}")
