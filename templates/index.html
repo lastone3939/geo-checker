@@ -793,10 +793,10 @@
 
       <div class="tab-container">
         <div class="tabs">
-          <button class="tab-btn active" data-tab="web" onclick="switchTab('web')">🌐 Web</button>
-          <button class="tab-btn" data-tab="gbp" onclick="switchTab('gbp')">📍 GBP</button>
-          <button class="tab-btn" data-tab="chat" onclick="switchTab('chat')">💬 チャット</button>
-          <button class="tab-btn" data-tab="video" onclick="switchTab('video')">🎬 動画</button>
+          <button class="tab-btn active" data-tab="web">🌐 Web</button>
+          <button class="tab-btn" data-tab="gbp">📍 GBP</button>
+          <button class="tab-btn" data-tab="chat">💬 チャット</button>
+          <button class="tab-btn" data-tab="video">🎬 動画</button>
         </div>
 
         <div id="tabWeb" class="tab-content active">
@@ -1420,12 +1420,15 @@ let lastResult = null;
 let currentMode = 'web';
 
 function switchTab(tab) {
+  console.log('switchTab called:', tab);
   // タブボタンのアクティブ状態更新
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+  const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  if (btn) btn.classList.add('active');
   const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo' };
-  document.getElementById(tabIds[tab] || 'tabWeb').classList.add('active');
+  const tabEl = document.getElementById(tabIds[tab] || 'tabWeb');
+  if (tabEl) tabEl.classList.add('active');
 
   // mainSectionを必ず表示に戻す（診断結果・ローディング中でも）
   const mainSection = document.getElementById('mainSection');
@@ -2339,6 +2342,26 @@ async function sendChatMessageText(msg) {
   sendBtn.disabled = false;
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
+
+// タブボタンにクリックイベントを設定（タッチ対応）
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var tab = this.getAttribute('data-tab');
+      if (tab) switchTab(tab);
+    });
+    // タッチイベントも追加（スマホ対応）
+    btn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      var tab = this.getAttribute('data-tab');
+      if (tab) switchTab(tab);
+    });
+  });
+  console.log('Tab listeners initialized');
+});
+
 </script>
 </body>
 </html>
