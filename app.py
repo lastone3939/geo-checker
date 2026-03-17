@@ -1917,7 +1917,7 @@ def chat():
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
-    return jsonify({"error": "リクエストが多すぎます。しばらく待ってから再度お試しください。"}), 429
+    return jsonify({"error": "アクセスが集中しています。1〜2分後にもう一度お試しください。"}), 429
 
 
 if __name__ == "__main__":

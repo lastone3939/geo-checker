@@ -125,7 +125,11 @@
       display: flex; gap: 0;
       border-bottom: 2px solid var(--border);
       margin-bottom: 24px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      white-space: nowrap;
     }
+    .tabs::-webkit-scrollbar { display: none; }
     .tab-btn {
       flex: 1; padding: 14px 16px;
       background: none; border: none;
@@ -135,6 +139,7 @@
       font-family: "Noto Sans JP", sans-serif;
       color: var(--text-sub); cursor: pointer;
       transition: all 0.2s; text-align: center;
+      min-height: 44px;
     }
     .tab-btn:hover { color: var(--text); background: rgba(26,115,232,0.06); }
     .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
@@ -991,6 +996,75 @@
       </div>
     </div>
 
+    <!-- zettai.co.jp サンプルレポート -->
+    <div class="lp-section">
+      <p class="lp-section-title">🌐 Web AI対応チェックのサンプル</p>
+      <p class="lp-section-sub">企業サイトのAI最適化状況を6つの指標で自動診断</p>
+      <div class="sample-report">
+        <span class="sample-badge">サンプル</span>
+        <p class="sample-biz-name">株式会社ZETTAI（zettai.co.jp）</p>
+        <div class="sample-score-row">
+          <div class="sample-score-circle">
+            <span class="sample-score-num" style="color:#F59E0B;">51</span>
+            <span class="sample-score-label">/ 100</span>
+          </div>
+          <div>
+            <span class="sample-grade" style="color:#F59E0B;">D</span>
+            <p class="sample-summary" style="margin-top:8px;">AIクローラーの基本的なアクセスは許可されているものの、llms.txtの内容が不適切で改善が必要です。</p>
+          </div>
+        </div>
+        <div style="margin-bottom:20px;">
+          <div class="s-bar-row">
+            <span class="s-bar-label">AI可読性</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:45%;background:var(--bad)"></div></div>
+            <span class="s-bar-score" style="color:var(--bad)">45</span>
+            <span class="s-bar-emoji">🔴</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">コンテンツ品質</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:60%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">60</span>
+            <span class="s-bar-emoji">🟡</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">構造化データ</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:35%;background:var(--bad)"></div></div>
+            <span class="s-bar-score" style="color:var(--bad)">35</span>
+            <span class="s-bar-emoji">🔴</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">メタ情報</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:65%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">65</span>
+            <span class="s-bar-emoji">🟡</span>
+          </div>
+          <div class="s-bar-row">
+            <span class="s-bar-label">技術的SEO</span>
+            <div class="s-bar-wrap"><div class="s-bar-fill" style="width:50%;background:var(--warn)"></div></div>
+            <span class="s-bar-score" style="color:var(--warn)">50</span>
+            <span class="s-bar-emoji">🟡</span>
+          </div>
+        </div>
+        <div class="sample-actions">
+          <div class="sample-action">
+            <span class="emoji">🔴</span>
+            <span>llms.txtの内容を適切に整備してください</span>
+          </div>
+          <div class="sample-action">
+            <span class="emoji">🔴</span>
+            <span>構造化データ（JSON-LD）を追加してください</span>
+          </div>
+          <div class="sample-action">
+            <span class="emoji">🟡</span>
+            <span>メタディスクリプションをAI向けに最適化してください</span>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:24px;">
+          <button onclick="switchTab('web');document.getElementById('webUrlInput').focus();window.scrollTo({top:0,behavior:'smooth'});" class="submit-btn" style="padding:14px 32px;font-size:16px;">あなたのサイトを診断する →</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 90日アクションプランサンプル -->
     <div class="lp-section" style="background:#F1F3F4;max-width:100%;padding-left:0;padding-right:0;">
       <div style="max-width:900px;margin:0 auto;padding:0 24px;">
@@ -1346,11 +1420,34 @@ let lastResult = null;
 let currentMode = 'web';
 
 function switchTab(tab) {
+  // タブボタンのアクティブ状態更新
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
   const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo' };
   document.getElementById(tabIds[tab] || 'tabWeb').classList.add('active');
+
+  // mainSectionを必ず表示に戻す（診断結果・ローディング中でも）
+  const mainSection = document.getElementById('mainSection');
+  if (mainSection) mainSection.classList.remove('hidden');
+
+  // 診断結果・ローディング・エラーセクションを非表示に戻す
+  const loadingSection = document.getElementById('loadingSection');
+  const resultSection = document.getElementById('resultSection');
+  const errorSection = document.getElementById('errorSection');
+  if (loadingSection) loadingSection.classList.remove('active');
+  if (resultSection) { resultSection.classList.remove('active'); resultSection.style.display = 'none'; }
+  if (errorSection) errorSection.classList.remove('active');
+
+  // タブコンテナの操作不可状態を解除
+  const tabContainer = document.querySelector('.tab-container');
+  if (tabContainer) { tabContainer.style.opacity = ''; tabContainer.style.pointerEvents = ''; }
+
+  // フォームのボタンを有効に戻す
+  ['webSubmitBtn', 'gbpSubmitBtn', 'videoSubmitBtn', 'mainChatBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
 }
 
 let mainChatHistory = [];
@@ -1382,13 +1479,20 @@ async function sendMainChat(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg, context: {}, history: mainChatHistory.slice(-6) })
     });
-    const data = await res.json();
-    const reply = data.reply || 'エラーが発生しました';
-    mainChatHistory.push({ role: 'assistant', content: reply });
-    document.getElementById(loadId).outerHTML = `<div style="display:flex;gap:10px;align-items:flex-start;">
-      <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🤖</div>
-      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;border-top-left-radius:4px;padding:12px 14px;font-size:14px;line-height:1.6;max-width:85%;">${escapeHtml(reply)}</div>
-    </div>`;
+    if (res.status === 429) {
+      document.getElementById(loadId).outerHTML = `<div style="display:flex;gap:10px;align-items:flex-start;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🤖</div>
+        <div style="background:#FEF3CD;border:1px solid #F59E0B;border-radius:12px;border-top-left-radius:4px;padding:12px 14px;font-size:14px;line-height:1.6;max-width:85%;color:#92400E;">アクセスが集中しています。しばらく待ってからお試しください。</div>
+      </div>`;
+    } else {
+      const data = await res.json();
+      const reply = data.reply || 'エラーが発生しました';
+      mainChatHistory.push({ role: 'assistant', content: reply });
+      document.getElementById(loadId).outerHTML = `<div style="display:flex;gap:10px;align-items:flex-start;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🤖</div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;border-top-left-radius:4px;padding:12px 14px;font-size:14px;line-height:1.6;max-width:85%;">${escapeHtml(reply)}</div>
+      </div>`;
+    }
   } catch(err) {
     document.getElementById(loadId).remove();
   }
@@ -1401,6 +1505,8 @@ let currentVideoJobId = null;
 function normalizeGbpUrl(input) {
   let url = input.trim();
   if (!url) return "";
+  // セキュリティ: javascript:, data:, vbscript: を拒否
+  if (/^javascript:/i.test(url) || /^data:/i.test(url) || /^vbscript:/i.test(url)) return "";
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
   return url;
 }
@@ -1536,6 +1642,7 @@ function priorityInfo(p) {
 function normalizeUrl(input) {
   let url = input.trim();
   if (!url) return '';
+  if (/^javascript:/i.test(url) || /^data:/i.test(url) || /^vbscript:/i.test(url)) return '';
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
   return url;
 }
@@ -1599,6 +1706,16 @@ async function runAnalysis(url, endpoint, mode) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
+    if (response.status === 429) {
+      clearInterval(stepInterval);
+      showError('アクセスが集中しています。しばらく待ってからお試しください。');
+      return;
+    }
+    if (!response.ok) {
+      clearInterval(stepInterval);
+      showError('サーバーエラーが発生しました（' + response.status + '）。もう一度お試しください。');
+      return;
+    }
     const data = await response.json();
     if (data.error) {
       clearInterval(stepInterval);
@@ -1634,13 +1751,14 @@ async function pollAnalyzeStatus(jobId, maxWait = 120000) {
 }
 
 function showLoading(mode) {
-  document.getElementById('mainSection').classList.add('hidden');
   document.getElementById('resultSection').classList.remove('active');
   document.getElementById('resultSection').style.display = 'none';
   document.getElementById('errorSection').classList.remove('active');
   document.getElementById('loadingSection').classList.add('active');
   document.getElementById('webSubmitBtn').disabled = true;
   document.getElementById('gbpSubmitBtn').disabled = true;
+  document.querySelector('.tab-container').style.opacity = '0.4';
+  document.querySelector('.tab-container').style.pointerEvents = 'none';
 }
 
 function showError(msg) {
@@ -1649,6 +1767,8 @@ function showError(msg) {
   document.getElementById('errorSection').classList.add('active');
   document.getElementById('webSubmitBtn').disabled = false;
   document.getElementById('gbpSubmitBtn').disabled = false;
+  document.querySelector('.tab-container').style.opacity = '';
+  document.querySelector('.tab-container').style.pointerEvents = '';
 }
 
 function showResults(data, mode) {
@@ -1658,6 +1778,8 @@ function showResults(data, mode) {
   resultEl.classList.add('active');
   document.getElementById('webSubmitBtn').disabled = false;
   document.getElementById('gbpSubmitBtn').disabled = false;
+  document.querySelector('.tab-container').style.opacity = '';
+  document.querySelector('.tab-container').style.pointerEvents = '';
   document.getElementById('successLottie').setAttribute('autoplay', '');
 
   const typeBadge = document.getElementById('resultTypeBadge');
@@ -1866,13 +1988,26 @@ function copyCode(elId, btn) {
 }
 
 function backToForm() {
+  // mainSectionを必ず表示に戻す
+  const mainSection = document.getElementById('mainSection');
+  if (mainSection) mainSection.classList.remove('hidden');
+
   document.getElementById('resultSection').style.display = 'none';
   document.getElementById('resultSection').classList.remove('active');
   document.getElementById('errorSection').classList.remove('active');
-  document.getElementById('mainSection').classList.remove('hidden');
+  document.getElementById('loadingSection').classList.remove('active');
   document.getElementById('gaugeFill').style.strokeDashoffset = 408;
+  document.querySelector('.tab-container').style.opacity = '';
+  document.querySelector('.tab-container').style.pointerEvents = '';
   document.getElementById('chat-fab').classList.add('hidden');
   document.getElementById('chat-panel').classList.remove('open');
+
+  // フォームボタンを有効に戻す
+  ['webSubmitBtn', 'gbpSubmitBtn', 'videoSubmitBtn', 'mainChatBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+
   if (currentMode === 'gbp') {
     document.getElementById('gbpUrlInput').focus();
   } else {
