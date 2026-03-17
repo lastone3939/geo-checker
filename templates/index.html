@@ -745,6 +745,7 @@
       .score-gauge svg { width: 100px; height: 100px; }
       .score-gauge .score-big { font-size: 30px; }
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -790,6 +791,7 @@
           <button class="tab-btn active" data-tab="web" onclick="switchTab('web')">🌐 Webサイト診断</button>
           <button class="tab-btn" data-tab="gbp" onclick="switchTab('gbp')">📍 Googleマップ診断（GBP）</button>
           <button class="tab-btn" data-tab="chat" onclick="switchTab('chat')">💬 AIチャット</button>
+          <button class="tab-btn" data-tab="video" onclick="switchTab('video')">🎬 動画生成</button>
         </div>
 
         <div id="tabWeb" class="tab-content active">
@@ -827,6 +829,88 @@
               <button type="submit" id="mainChatBtn" class="submit-btn" style="white-space:nowrap;">送信</button>
             </form>
             <p class="url-hint">GBP・MEO・AI検索対策・Googleマップ集客について専門家AIがお答えします</p>
+          </div>
+        </div>
+
+        <div id="tabVideo" class="tab-content">
+          <div style="padding-top:16px;">
+
+            <!-- ヒーローコピー -->
+            <div style="text-align:center;margin-bottom:20px;">
+              <p style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;">
+                GBPに動画を追加するだけでAI検索・MEO評価がUP
+              </p>
+              <p style="font-size:13px;color:var(--text-sub);">
+                GoogleマップのURLを貼るだけ。写真を自動収集して20秒の動画を無料生成。
+              </p>
+            </div>
+
+            <!-- URL入力 -->
+            <form id="videoForm" class="form-wrap" onsubmit="startVideoGeneration(event)">
+              <input type="text" id="videoUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url">
+              <button type="submit" id="videoSubmitBtn" class="submit-btn gbp-btn" style="white-space:nowrap;">動画を生成</button>
+            </form>
+            <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code></p>
+
+            <!-- サンプル動画セクション -->
+            <div style="margin-top:20px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">📽️ サンプル動画（こんな動画が生成されます）</p>
+              <div style="background:#1A1A2E;border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;position:relative;overflow:hidden;">
+                <div class="sample-slide" style="position:absolute;inset:0;background:linear-gradient(135deg,#1A73E820,#34A85320);display:flex;align-items:center;justify-content:center;">
+                  <div style="text-align:center;color:white;">
+                    <div style="font-size:36px;margin-bottom:8px;">🏪</div>
+                    <div style="font-size:14px;font-weight:600;">店舗外観</div>
+                  </div>
+                </div>
+                <div style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;">
+                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.9;"></div>
+                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.4;"></div>
+                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.4;"></div>
+                  <div style="width:6px;height:6px;border-radius:50%;background:white;opacity:0.4;"></div>
+                </div>
+                <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;font-size:11px;padding:2px 8px;border-radius:4px;">20秒</div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                <span style="background:#E8F0FE;color:#1A73E8;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;">✅ 写真を自動収集</span>
+                <span style="background:#E6F4EA;color:#34A853;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;">✅ 最大12枚スライド</span>
+                <span style="background:#FEF7E0;color:#F59E0B;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;">✅ GBPにそのままアップ可</span>
+              </div>
+            </div>
+
+            <!-- 生成中UI -->
+            <div id="videoProgressArea" style="display:none;margin-top:16px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <div style="width:20px;height:20px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <span id="videoProgressText" style="font-size:14px;font-weight:600;color:var(--text);">写真を収集中...</span>
+              </div>
+              <div style="background:#E8EAED;border-radius:4px;height:6px;overflow:hidden;">
+                <div id="videoProgressBar" style="height:100%;background:var(--primary);border-radius:4px;width:0%;transition:width 0.5s ease;"></div>
+              </div>
+            </div>
+
+            <!-- 完成UI -->
+            <div id="videoResultArea" style="display:none;margin-top:16px;">
+              <div style="padding:16px;background:#E6F4EA;border-radius:12px;border:1px solid #34A853;margin-bottom:12px;">
+                <p style="font-size:14px;font-weight:700;color:#34A853;margin-bottom:4px;">✅ 動画が完成しました！</p>
+                <p style="font-size:13px;color:#2D7D46;" id="videoPhotoCount"></p>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="videoDownloadBtn" onclick="downloadVideo()" class="submit-btn" style="flex:1;min-width:140px;">
+                  ⬇️ ダウンロード
+                </button>
+                <button onclick="resetVideoForm()" style="flex:1;min-width:140px;padding:12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:14px;font-weight:600;">
+                  もう一度作る
+                </button>
+              </div>
+              <div style="margin-top:12px;">
+                <p style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">📧 メールで送信（任意）</p>
+                <div style="display:flex;gap:8px;">
+                  <input type="email" id="videoEmailInput" placeholder="送信先メールアドレス" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+                  <button onclick="sendVideo()" style="padding:10px 16px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">送信</button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -1265,7 +1349,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
-  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat' };
+  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo' };
   document.getElementById(tabIds[tab] || 'tabWeb').classList.add('active');
 }
 
@@ -1310,6 +1394,125 @@ async function sendMainChat(e) {
   }
   box.scrollTop = box.scrollHeight;
   document.getElementById('mainChatBtn').disabled = false;
+}
+
+let currentVideoJobId = null;
+
+function normalizeGbpUrl(input) {
+  let url = input.trim();
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  return url;
+}
+
+async function startVideoGeneration(e) {
+  e.preventDefault();
+  const url = normalizeGbpUrl(document.getElementById("videoUrlInput").value);
+  if (!url) return;
+
+  document.getElementById("videoProgressArea").style.display = "block";
+  document.getElementById("videoResultArea").style.display = "none";
+  document.getElementById("videoSubmitBtn").disabled = true;
+  document.getElementById("videoProgressBar").style.width = "10%";
+  document.getElementById("videoProgressText").textContent = "写真を収集中...";
+
+  try {
+    const res = await fetch("/api/create-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); resetVideoProgress(); return; }
+    currentVideoJobId = data.job_id;
+    pollVideoProgress(currentVideoJobId);
+  } catch(err) {
+    alert("エラーが発生しました。URLを確認してください。");
+    resetVideoProgress();
+  }
+}
+
+async function pollVideoProgress(jobId) {
+  const steps = [
+    { progress: 20, text: "写真をダウンロード中..." },
+    { progress: 50, text: "写真をダウンロード中..." },
+    { progress: 70, text: "動画をエンコード中..." },
+    { progress: 85, text: "動画を仕上げ中..." },
+    { progress: 95, text: "もうすぐ完成..." },
+  ];
+  let stepIdx = 0;
+
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const res = await fetch("/api/video-status/" + jobId);
+      const data = await res.json();
+
+      if (data.status === "done") {
+        document.getElementById("videoProgressBar").style.width = "100%";
+        document.getElementById("videoProgressText").textContent = "完成！";
+        await new Promise(r => setTimeout(r, 500));
+        document.getElementById("videoProgressArea").style.display = "none";
+        document.getElementById("videoResultArea").style.display = "block";
+        document.getElementById("videoPhotoCount").textContent = `${data.photo_count || 0}枚の写真でスライドショー動画を生成しました`;
+        document.getElementById("videoSubmitBtn").disabled = false;
+        return;
+      }
+      if (data.status === "error") {
+        alert(data.error || "動画の生成に失敗しました");
+        resetVideoProgress();
+        return;
+      }
+
+      // プログレス更新
+      if (stepIdx < steps.length) {
+        const step = steps[stepIdx];
+        document.getElementById("videoProgressBar").style.width = step.progress + "%";
+        document.getElementById("videoProgressText").textContent = step.text;
+        stepIdx++;
+      }
+    } catch(err) {}
+  }
+  alert("タイムアウトしました。もう一度お試しください。");
+  resetVideoProgress();
+}
+
+function resetVideoProgress() {
+  document.getElementById("videoProgressArea").style.display = "none";
+  document.getElementById("videoProgressBar").style.width = "0%";
+  document.getElementById("videoSubmitBtn").disabled = false;
+}
+
+function resetVideoForm() {
+  document.getElementById("videoResultArea").style.display = "none";
+  document.getElementById("videoUrlInput").value = "";
+  currentVideoJobId = null;
+}
+
+function downloadVideo() {
+  if (!currentVideoJobId) return;
+  window.open("/api/video-download/" + currentVideoJobId, "_blank");
+}
+
+async function sendVideo() {
+  const email = document.getElementById("videoEmailInput").value.trim();
+  if (!email || !currentVideoJobId) return;
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "送信中...";
+  try {
+    const res = await fetch("/api/send-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: currentVideoJobId, email, business_name: "お客様" })
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+  } catch(err) {
+    alert("送信に失敗しました");
+  }
+  btn.disabled = false;
+  btn.textContent = "送信";
 }
 
 function scoreColor(score) {
