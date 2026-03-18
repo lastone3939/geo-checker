@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import re
 import sqlite3
@@ -1790,72 +1791,67 @@ def admin_logs():
     gbp_total = len(gbp_rows)
     gbp_avg = round(sum(r[3] for r in gbp_rows if r[3]) / gbp_total, 1) if gbp_total else 0
     now_str = datetime.now().strftime("%Y/%m/%d %H:%M")
-    html = f"""<!DOCTYPE html>
-<html lang="ja"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>【管理画面】GBP改善君 営業ダッシュボード</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:"Noto Sans JP",sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}}
-.header{{background:#1e293b;border-bottom:1px solid #334155;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}}
-.header h1{{font-size:18px;font-weight:800;color:#38bdf8}}
-.header .meta{{font-size:12px;color:#64748b}}
-.body{{padding:24px;max-width:1200px;margin:0 auto}}
-.kpi-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}}
-@media(max-width:640px){{.kpi-grid{{grid-template-columns:repeat(2,1fr)}}}}
-.kpi{{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px}}
-.kpi-val{{font-size:28px;font-weight:900;line-height:1}}
-.kpi-lbl{{font-size:11px;color:#64748b;margin-top:4px}}
-.blue{{color:#38bdf8}}.green{{color:#4ade80}}.yellow{{color:#fbbf24}}.red{{color:#f87171}}
-.section-title{{font-size:13px;font-weight:700;color:#94a3b8;letter-spacing:.05em;text-transform:uppercase;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #334155}}
-.card{{background:#1e293b;border:1px solid #334155;border-radius:10px;overflow:hidden;margin-bottom:24px}}
-.card-header{{background:#0f2744;padding:12px 16px;font-size:13px;font-weight:700;color:#38bdf8;border-bottom:1px solid #334155}}
-table{{width:100%;border-collapse:collapse}}
-th{{background:#0f172a;padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}}
-td{{padding:10px 14px;border-top:1px solid #1e293b;font-size:13px;vertical-align:middle}}
-tr:hover td{{background:#16213e}}
-.badge{{font-weight:700;padding:2px 8px;border-radius:4px;font-size:11px;display:inline-block}}
-.A{{background:#14532d;color:#4ade80}}.B{{background:#713f12;color:#fbbf24}}
-.C,.D{{background:#7f1d1d;color:#f87171}}.F{{background:#1e293b;color:#94a3b8}}
-.status-new{{background:#1e40af;color:#93c5fd;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}}
-.status-contacted{{background:#713f12;color:#fcd34d;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}}
-.status-closed{{background:#14532d;color:#86efac;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}}
-.btn-note{{background:#38bdf8;color:#0f172a;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700}}
-.btn-link{{background:#334155;color:#e2e8f0;padding:4px 8px;border-radius:6px;font-size:11px;text-decoration:none;display:inline-block}}
-.url-cell{{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:11px}}
-.biz-name{{font-weight:700;color:#e2e8f0}}
-.date-cell{{font-size:11px;color:#64748b;white-space:nowrap}}
-/* モーダル */
-.modal-bg{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}}
-.modal-bg.open{{display:flex}}
-.modal{{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;width:90%;max-width:460px}}
-.modal h3{{font-size:16px;font-weight:700;color:#38bdf8;margin-bottom:16px}}
-.modal input,.modal textarea,.modal select{{width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:13px;font-family:inherit}}
-.modal select option{{background:#0f172a}}
-.modal-footer{{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}}
-.btn-cancel{{background:#334155;color:#e2e8f0;border:none;padding:8px 16px;border-radius:6px;cursor:pointer}}
-.btn-save{{background:#38bdf8;color:#0f172a;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:700}}
-</style></head>
-<body>
-<div class="header">
-  <h1>🎯 GBP改善君 営業ダッシュボード</h1>
-  <div class="meta">最終更新: {now_str} ／ 社長専用・非公開</div>
-</div>
-<div class="body">
-<div class="kpi-grid">
-  <div class="kpi"><div class="kpi-val green">{gbp_total}</div><div class="kpi-lbl">GBP診断数（営業対象）</div></div>
-  <div class="kpi"><div class="kpi-val blue">{gbp_avg}</div><div class="kpi-lbl">GBP平均スコア</div></div>
-  <div class="kpi"><div class="kpi-val yellow">{web_total}</div><div class="kpi-lbl">Webサイト診断数</div></div>
-  <div class="kpi"><div class="kpi-val blue">{web_avg}</div><div class="kpi-lbl">Web平均スコア</div></div>
-</div>
-
-<div class="card">
-<div class="card-header">🌐 Webサイト診断ログ（{web_total}件）</div>
-<div style="overflow-x:auto"><table>
-<tr><th>#</th><th>URL</th><th>スコア</th><th>グレード</th><th>日時</th></tr>
-""".format(web_total=web_total)
+    # CSS は別変数（f-string との {} 衝突を防ぐ）
+    admin_css = """
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Noto Sans JP", sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+.header { background: #1e293b; border-bottom: 1px solid #334155; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.header h1 { font-size: 18px; font-weight: 800; color: #38bdf8; }
+.header .meta { font-size: 12px; color: #64748b; }
+.body { padding: 24px; max-width: 1200px; margin: 0 auto; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+@media(max-width:640px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+.kpi { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; }
+.kpi-val { font-size: 28px; font-weight: 900; line-height: 1; }
+.kpi-lbl { font-size: 11px; color: #64748b; margin-top: 4px; }
+.blue { color: #38bdf8; } .green { color: #4ade80; } .yellow { color: #fbbf24; } .red { color: #f87171; }
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+.card-header { background: #0f2744; padding: 12px 16px; font-size: 13px; font-weight: 700; color: #38bdf8; border-bottom: 1px solid #334155; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #0f172a; padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; white-space: nowrap; }
+td { padding: 10px 14px; border-top: 1px solid #0f172a; font-size: 13px; vertical-align: middle; }
+tr:hover td { background: #16213e; }
+.badge { font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 11px; display: inline-block; }
+.A { background: #14532d; color: #4ade80; } .B { background: #713f12; color: #fbbf24; }
+.C, .D { background: #7f1d1d; color: #f87171; } .F { background: #1e293b; color: #94a3b8; }
+.status-new { background: #1e40af; color: #93c5fd; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.status-contacted { background: #713f12; color: #fcd34d; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.status-closed { background: #14532d; color: #86efac; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.btn-note { background: #38bdf8; color: #0f172a; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; }
+.btn-link { background: #334155; color: #e2e8f0; padding: 4px 8px; border-radius: 6px; font-size: 11px; text-decoration: none; display: inline-block; }
+.url-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #64748b; font-size: 11px; }
+.biz-name { font-weight: 700; color: #e2e8f0; }
+.date-cell { font-size: 11px; color: #64748b; white-space: nowrap; }
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; width: 90%; max-width: 460px; }
+.modal h3 { font-size: 16px; font-weight: 700; color: #38bdf8; margin-bottom: 16px; }
+.modal input, .modal textarea, .modal select { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; font-family: inherit; }
+.modal select option { background: #0f172a; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.btn-cancel { background: #334155; color: #e2e8f0; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.btn-save { background: #38bdf8; color: #0f172a; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 700; }
+"""
+    html = (
+        f'<!DOCTYPE html><html lang="ja"><head>'
+        f'<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">'
+        f'<title>【管理画面】GBP改善君 営業ダッシュボード</title>'
+        f'<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">'
+        f'<style>{admin_css}</style></head><body>'
+        f'<div class="header"><h1>🎯 GBP改善君 営業ダッシュボード</h1>'
+        f'<div class="meta">最終更新: {now_str} ／ 社長専用・非公開</div></div>'
+        f'<div class="body">'
+        f'<div class="kpi-grid">'
+        f'<div class="kpi"><div class="kpi-val green">{gbp_total}</div><div class="kpi-lbl">GBP診断数（営業対象）</div></div>'
+        f'<div class="kpi"><div class="kpi-val blue">{gbp_avg}</div><div class="kpi-lbl">GBP平均スコア</div></div>'
+        f'<div class="kpi"><div class="kpi-val yellow">{web_total}</div><div class="kpi-lbl">Webサイト診断数</div></div>'
+        f'<div class="kpi"><div class="kpi-val blue">{web_avg}</div><div class="kpi-lbl">Web平均スコア</div></div>'
+        f'</div>'
+        f'<div class="card">'
+        f'<div class="card-header">🌐 Webサイト診断ログ（{web_total}件）</div>'
+        f'<div style="overflow-x:auto"><table>'
+        f'<tr><th>#</th><th>URL</th><th>スコア</th><th>グレード</th><th>日時</th></tr>'
+    )
     for r in web_rows:
         rid, url, score, grade, ip, created_at = r
         grade_cls = (grade or "F")[0]
@@ -1864,11 +1860,14 @@ tr:hover td{{background:#16213e}}
         html += f'<tr><td style="color:#64748b;font-size:11px">{rid}</td><td class="url-cell" title="{url}">{short_url}</td><td style="font-weight:700;color:#38bdf8">{score or "-"}</td><td><span class="badge {grade_cls}">{grade or "-"}</span></td><td class="date-cell">{date_short}</td></tr>'
     html += """</table></div></div>
 
-<div class="card">
-<div class="card-header">🏪 GBP診断ログ 営業リスト（{gbp_total}件）<span style="font-size:11px;font-weight:400;margin-left:8px;color:#94a3b8">← ここが営業リスト。スコアが低い店舗ほど改善提案しやすい</span></div>
-<div style="overflow-x:auto"><table>
-<tr><th>店舗名</th><th>スコア</th><th>判定</th><th>診断日時</th><th>URL</th><th>営業状況</th><th>操作</th></tr>
-""".format(gbp_total=gbp_total)
+    html += (
+        f'</table></div></div>'
+        f'<div class="card">'
+        f'<div class="card-header">🏪 GBP診断ログ 営業リスト（{gbp_total}件）'
+        f'<span style="font-size:11px;font-weight:400;margin-left:8px;color:#94a3b8">← スコアが低い店舗ほど改善提案しやすい</span></div>'
+        f'<div style="overflow-x:auto"><table>'
+        f'<tr><th>店舗名</th><th>スコア</th><th>判定</th><th>診断日時</th><th>URL</th><th>営業状況</th><th>操作</th></tr>'
+    )
     # 営業メモも取得
     conn2 = sqlite3.connect(DB_PATH)
     notes_map = {}
@@ -1905,52 +1904,50 @@ tr:hover td{{background:#16213e}}
   <a class="btn-link" href="{url}" target="_blank" style="margin-left:4px">🔗</a>
 </td>
 </tr>'''
-    html += f"""</table></div></div>
-
-<!-- 営業メモモーダル -->
-<div id="noteModal" class="modal-bg">
-  <div class="modal">
-    <h3 id="modalTitle">📝 営業メモ</h3>
-    <input id="noteEmail" type="email" placeholder="メールアドレス">
-    <input id="notePhone" type="tel" placeholder="電話番号">
-    <textarea id="noteText" placeholder="商談メモ・次のアクションなど" rows="3"></textarea>
-    <select id="noteStatus">
-      <option value="new">🔵 未接触（新規）</option>
-      <option value="contacted">🟡 接触済み</option>
-      <option value="closed">🟢 成約</option>
-    </select>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeNote()">キャンセル</button>
-      <button class="btn-save" onclick="saveNote()">保存</button>
-    </div>
-  </div>
-</div>
-
-</div><!-- /body -->
-<script>
-let currentNoteId = null;
-function openNote(id, name, url) {{
-  currentNoteId = id;
-  document.getElementById('modalTitle').textContent = '📝 営業メモ: ' + name;
-  document.getElementById('noteModal').classList.add('open');
-}}
-function closeNote() {{ document.getElementById('noteModal').classList.remove('open'); }}
-async function saveNote() {{
-  const res = await fetch('/admin/save-note?token={token}', {{
-    method: 'POST',
-    headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{
-      id: currentNoteId,
-      email: document.getElementById('noteEmail').value,
-      phone: document.getElementById('notePhone').value,
-      note: document.getElementById('noteText').value,
-      status: document.getElementById('noteStatus').value
-    }})
-  }});
-  if (res.ok) {{ closeNote(); location.reload(); }}
-}}
-</script>
-</body></html>"""
+    modal_html = (
+        '</table></div></div>'
+        '<div id="noteModal" class="modal-bg">'
+        '<div class="modal">'
+        '<h3 id="modalTitle">Sales Note</h3>'
+        '<input id="noteEmail" type="email" placeholder="Email address">'
+        '<input id="notePhone" type="tel" placeholder="Phone number">'
+        '<textarea id="noteText" placeholder="Sales memo / next action" rows="3"></textarea>'
+        '<select id="noteStatus">'
+        '<option value="new">New (not contacted)</option>'
+        '<option value="contacted">Contacted</option>'
+        '<option value="closed">Closed</option>'
+        '</select>'
+        '<div class="modal-footer">'
+        '<button class="btn-cancel" onclick="closeNote()">Cancel</button>'
+        '<button class="btn-save" onclick="saveNote()">Save</button>'
+        '</div></div></div>'
+        '</div>'
+    )
+    script_html = (
+        '<script>'
+        'var _tok="' + token + '";'
+        'var currentNoteId=null;'
+        'function openNote(id,name,url){'
+        'currentNoteId=id;'
+        'document.getElementById("modalTitle").textContent="&#32993;&#26989;&#12513;&#12514;: "+name;'
+        'document.getElementById("noteModal").classList.add("open");}'
+        'function closeNote(){document.getElementById("noteModal").classList.remove("open");}'
+        'async function saveNote(){'
+        'var res=await fetch("/admin/save-note?token="+_tok,{'
+        'method:"POST",'
+        'headers:{"Content-Type":"application/json"},'
+        'body:JSON.stringify({'
+        'id:currentNoteId,'
+        'email:document.getElementById("noteEmail").value,'
+        'phone:document.getElementById("notePhone").value,'
+        'note:document.getElementById("noteText").value,'
+        'status:document.getElementById("noteStatus").value'
+        '})});'
+        'if(res.ok){closeNote();location.reload();}}'
+        '</script>'
+        '</body></html>'
+    )
+    html += modal_html + script_html
     return html
 
 
