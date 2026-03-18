@@ -856,10 +856,76 @@
             </form>
             <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>g.page</code></p>
 
-            <div style="margin-top:16px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
-              <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 6項目AI診断</span>
-              <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 具体的な改善提案</span>
-              <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 90日改善プラン</span>
+            <!-- 実際のGBP診断結果サンプル（焼肉いたみ） -->
+            <div style="margin-top:20px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">📍 実際の診断結果サンプル</p>
+              <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">※ 焼肉いたみ（池袋）を実際に診断した結果</p>
+
+              <div style="background:white;border-radius:8px;padding:14px;border:1px solid #e1e5e9;margin-bottom:10px;">
+                <!-- 店舗ヘッダー -->
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                  <img src="/static/samples/itami_thumb.jpg"
+                    style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;"
+                    onerror="this.style.display='none'">
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:700;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">焼肉いたみ（池袋）</div>
+                    <div style="font-size:11px;color:var(--muted);">東京都豊島区池袋 🥩 焼肉</div>
+                    <div style="font-size:11px;color:#f59e0b;">⭐ 4.0（181件）</div>
+                  </div>
+                  <div style="text-align:center;flex-shrink:0;">
+                    <div style="background:#f59e0b;color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;margin-bottom:2px;">C</div>
+                    <div style="font-size:18px;font-weight:800;color:#f59e0b;">63点</div>
+                  </div>
+                </div>
+
+                <!-- カテゴリ別スコア -->
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
+                    <div style="font-size:15px;">📋</div>
+                    <div>
+                      <div style="font-size:10px;font-weight:600;color:#2d7d46;">プロフィール完成度</div>
+                      <div style="font-size:13px;font-weight:700;color:#34a853;">72点</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fee2e2;border-radius:6px;">
+                    <div style="font-size:15px;">📸</div>
+                    <div>
+                      <div style="font-size:10px;font-weight:600;color:#991b1b;">写真・動画</div>
+                      <div style="font-size:13px;font-weight:700;color:#dc2626;">41点</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
+                    <div style="font-size:15px;">⭐</div>
+                    <div>
+                      <div style="font-size:10px;font-weight:600;color:#2d7d46;">クチコミ管理</div>
+                      <div style="font-size:13px;font-weight:700;color:#34a853;">78点</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fee2e2;border-radius:6px;">
+                    <div style="font-size:15px;">🌐</div>
+                    <div>
+                      <div style="font-size:10px;font-weight:600;color:#991b1b;">ウェブ連携</div>
+                      <div style="font-size:13px;font-weight:700;color:#dc2626;">30点</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AI改善提案 -->
+                <div style="margin-top:10px;padding:10px;background:#FEF7E0;border-radius:6px;border-left:3px solid #F59E0B;">
+                  <div style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;">💡 AI改善提案（抜粋）</div>
+                  <div style="font-size:11px;color:#78350F;line-height:1.7;">
+                    ・Webサイト未登録 → 登録で集客力が大幅UP<br>
+                    ・写真10枚のみ → 30枚以上でAI検索評価UP<br>
+                    ・動画コンテンツなし → 追加でサムネイル露出UP
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 6項目AI診断</span>
+                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 具体的な改善提案</span>
+                <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 90日改善プラン</span>
+              </div>
             </div>
           </div>
         </div>
@@ -917,40 +983,32 @@
               </button>
             </div>
 
-            <!-- サンプル動画セクション -->
+            <!-- サンプル動画セクション（実際の生成結果） -->
             <div style="margin-top:20px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
-              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">📽️ サンプル動画（このような動画が作れます）</p>
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">📽️ 実際に生成した動画サンプル</p>
+              <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">※ 焼肉いたみ（池袋）のGoogleマップ写真で実際に生成</p>
 
-              <!-- 実際のサンプル動画 -->
-              <div style="display:flex;justify-content:center;margin-bottom:12px;">
-                <video
-                  controls
-                  preload="metadata"
-                  style="width:200px;height:356px;border-radius:8px;background:#000;"
-                  poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='356' viewBox='0 0 200 356'%3E%3Crect width='200' height='356' fill='%23f8f9fa'/%3E%3Ctext x='100' y='178' text-anchor='middle' font-size='40'%3E🏪%3C/text%3E%3C/svg%3E"
-                >
-                  <source src="/api/video-download/93077c96-49b3-4beb-836f-932d54989a7f" type="video/mp4">
-                  お使いのブラウザでは動画を再生できません。
-                </video>
-              </div>
-
-              <!-- エフェクト種類の説明 -->
-              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">
-                <div style="text-align:center;padding:8px;background:white;border-radius:6px;border:1px solid #e1e5e9;">
-                  <div style="font-size:18px;margin-bottom:2px;">🎬</div>
-                  <div style="font-size:11px;font-weight:600;color:#1a73e8;">ノーマル</div>
+              <!-- 2本並べて表示 -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                <div>
+                  <div style="font-size:11px;font-weight:700;color:#1a73e8;text-align:center;margin-bottom:6px;">🎬 シンプル</div>
+                  <video
+                    controls
+                    preload="metadata"
+                    style="width:100%;border-radius:8px;background:#000;aspect-ratio:16/9;"
+                  >
+                    <source src="/static/samples/itami_normal.mp4" type="video/mp4">
+                  </video>
                 </div>
-                <div style="text-align:center;padding:8px;background:linear-gradient(135deg,#ff6b9d,#c44aff);color:white;border-radius:6px;">
-                  <div style="font-size:18px;margin-bottom:2px;">✨</div>
-                  <div style="font-size:11px;font-weight:600;">キラキラ</div>
-                </div>
-                <div style="text-align:center;padding:8px;background:linear-gradient(135deg,#ffb347,#ffcc02);color:white;border-radius:6px;">
-                  <div style="font-size:18px;margin-bottom:2px;">🌟</div>
-                  <div style="font-size:11px;font-weight:600;">キラ+フェード</div>
-                </div>
-                <div style="text-align:center;padding:8px;background:linear-gradient(135deg,#9d50bb,#6f42c1);color:white;border-radius:6px;">
-                  <div style="font-size:18px;margin-bottom:2px;">🔍</div>
-                  <div style="font-size:11px;font-weight:600;">キラ+ズーム</div>
+                <div>
+                  <div style="font-size:11px;font-weight:700;text-align:center;margin-bottom:6px;background:linear-gradient(135deg,#FF6B9D,#C44AFF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">✨ 店内ツアー風</div>
+                  <video
+                    controls
+                    preload="metadata"
+                    style="width:100%;border-radius:8px;background:#000;aspect-ratio:16/9;"
+                  >
+                    <source src="/static/samples/itami_sparkle.mp4" type="video/mp4">
+                  </video>
                 </div>
               </div>
 
