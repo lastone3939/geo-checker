@@ -534,15 +534,14 @@ def resolve_url(url: str) -> tuple:
 
 
 def validate_gbp_url(url):
-    """GoogleマップURLのバリデーション（share.google / maps.app.goo.gl も許可）"""
+    """GoogleマップURLのバリデーション（国際対応・ほぼ全パターン許可）"""
     parsed = urlparse(url)
-    valid_hosts = [
-        "maps.google.com", "www.google.com", "google.com",
-        "maps.google.co.jp", "www.google.co.jp", "google.co.jp",
-        "g.page", "goo.gl", "maps.app.goo.gl", "share.google",
-    ]
     host = parsed.netloc.lower()
-    if any(host == h or host.endswith("." + h) for h in valid_hosts):
+    # google系ドメイン全般（google.co.jp / google.co.uk / maps.google.de 等）
+    if re.search(r'(^|\.)google\.(com|co\.|[a-z]{2,3})', host):
+        return True
+    # 短縮URL
+    if any(host == h or host.endswith("." + h) for h in ["g.page", "goo.gl", "maps.app.goo.gl", "share.google"]):
         return True
     return False
 

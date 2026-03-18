@@ -741,10 +741,21 @@
       .action-btns { flex-direction: column; }
       .action-btns button { width: 100%; min-height: 48px; }
       .plan-cards { grid-template-columns: 1fr; }
+      /* 動画サンプル：スマホでは縦積み */
+      #tabVideo .store-grid, #tabVideo [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+      /* GBP URL図解 */
+      #tabGbp [style*="grid-template-columns: repeat(2"] { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 480px) {
       .chat-panel { width: calc(100vw - 32px); right: 16px; bottom: 80px; height: 400px; }
       .chat-fab { bottom: 16px; right: 16px; }
+      /* タブ：アイコンのみにして省スペース */
+      .tab-btn { font-size: 11px; padding: 8px 10px; }
+      /* 動画2本並びをスマホで縦に */
+      [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+      video { width: 100% !important; aspect-ratio: 16/9; }
+      /* KPIカード */
+      .kpi-row { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 390px) {
       .site-header .logo { font-size: 15px; }
