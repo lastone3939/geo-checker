@@ -1989,38 +1989,33 @@ def action_plan():
     if not gbp_result:
         return jsonify({"error": "GBP分析結果が必要です"}), 400
 
-    prompt = f"""あなたはGoogleビジネスプロフィール（GBP）とローカルSEOの専門家です。
-以下のGBP診断結果を踏まえて、90日間の具体的な週次アクションプランをJSON形式で生成してください。
-
-## GBP診断結果
-ビジネス名: {gbp_result.get('business_name', '不明')}
-総合スコア: {gbp_result.get('overall_score', 0)}/100 (グレード: {gbp_result.get('grade', '-')})
-サマリー: {gbp_result.get('summary', '')}
-
-カテゴリ別:
-{json.dumps(gbp_result.get('categories', {}), ensure_ascii=False, indent=2)}
-
-## 出力形式（必ずこのJSON形式のみで回答）
-{{
-  "weeks": [
-    {{ "week": "1-2週目", "theme": "基盤整備", "tasks": ["具体的タスク1", "具体的タスク2", "具体的タスク3"], "priority": "high" }},
-    {{ "week": "3-4週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "high" }},
-    {{ "week": "5-6週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "medium" }},
-    {{ "week": "7-8週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "medium" }},
-    {{ "week": "9-10週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "low" }},
-    {{ "week": "11-12週目", "theme": "テーマ", "tasks": ["タスク1", "タスク2", "タスク3"], "priority": "low" }}
-  ],
-  "quick_wins": ["今日すぐできること1", "今日すぐできること2", "今日すぐできること3"],
-  "kpis": ["90日後の目標指標1", "90日後の目標指標2", "90日後の目標指標3"]
-}}
-
-## ルール
-- 診断結果のスコアが低いカテゴリを優先的に改善するプランにすること
-- 各タスクは「〜する」「〜を投稿する」のように具体的な動作にすること
-- 1-4週目=基盤整備（priority: high）、5-8週目=成長施策（priority: medium）、9-12週目=最適化（priority: low）
-- quick_winsは今日30分以内にできることを3つ
-- kpisは90日後に達成すべき具体的な数値目標を3つ
-"""
+    bname = gbp_result.get('business_name', '')
+    score = gbp_result.get('overall_score', 0)
+    grade = gbp_result.get('grade', '-')
+    summary = gbp_result.get('summary', '')
+    cats_json = json.dumps(gbp_result.get('categories', {}), ensure_ascii=False, indent=2)
+    prompt = (
+        "GBP(Google Business Profile) and local SEO expert. "
+        "Create a 90-day action plan in JSON format based on the diagnosis below.\n\n"
+        "Business: " + str(bname) + "\n"
+        "Score: " + str(score) + "/100 (Grade: " + str(grade) + ")\n"
+        "Summary: " + str(summary) + "\n"
+        "Categories:\n" + cats_json + "\n\n"
+        'Output ONLY this JSON format:\n'
+        '{\n'
+        '  "weeks": [\n'
+        '    {"week": "Week 1-2", "theme": "Foundation", "tasks": ["task1","task2","task3"], "priority": "high"},\n'
+        '    {"week": "Week 3-4", "theme": "Theme", "tasks": ["task1","task2","task3"], "priority": "high"},\n'
+        '    {"week": "Week 5-6", "theme": "Theme", "tasks": ["task1","task2","task3"], "priority": "medium"},\n'
+        '    {"week": "Week 7-8", "theme": "Theme", "tasks": ["task1","task2","task3"], "priority": "medium"},\n'
+        '    {"week": "Week 9-10", "theme": "Theme", "tasks": ["task1","task2","task3"], "priority": "low"},\n'
+        '    {"week": "Week 11-12", "theme": "Theme", "tasks": ["task1","task2","task3"], "priority": "low"}\n'
+        '  ],\n'
+        '  "quick_wins": ["quick win 1","quick win 2","quick win 3"],\n'
+        '  "kpis": ["kpi goal 1","kpi goal 2","kpi goal 3"]\n'
+        '}\n'
+        'Rules: prioritize low-score categories. Be specific. Reply in Japanese.'
+    )
     try:
         result = call_gemini(prompt)
         return jsonify(result)
