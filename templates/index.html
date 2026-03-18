@@ -857,7 +857,41 @@
               <input type="text" id="gbpUrlInput" class="url-input" placeholder="GoogleマップURLを貼り付け..." autocomplete="url">
               <button type="submit" id="gbpSubmitBtn" class="submit-btn gbp-btn">診断スタート</button>
             </form>
-            <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>g.page</code></p>
+            <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>share.google</code></p>
+
+            <!-- GBP URL取得方法 図解 -->
+            <div style="margin-top:16px;padding:14px 16px;background:#F0F7FF;border-radius:10px;border:1px solid #C8DCFF;">
+              <p style="font-size:12px;font-weight:700;color:#1A73E8;margin-bottom:10px;">📖 GoogleマップURLの取り方（3ステップ）</p>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <div style="background:#1A73E8;color:white;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">1</div>
+                  <div>
+                    <div style="font-size:12px;font-weight:700;color:#333;">Googleマップで店舗を検索</div>
+                    <div style="font-size:11px;color:#666;">maps.google.com または Google検索から「マップ」をクリック</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <div style="background:#1A73E8;color:white;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">2</div>
+                  <div>
+                    <div style="font-size:12px;font-weight:700;color:#333;">店舗名をタップして詳細を開く</div>
+                    <div style="font-size:11px;color:#666;">左側または下部に店舗情報が表示されます</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <div style="background:#1A73E8;color:white;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">3</div>
+                  <div>
+                    <div style="font-size:12px;font-weight:700;color:#333;">URLをコピーして貼り付け</div>
+                    <div style="font-size:11px;color:#666;">ブラウザのアドレスバーのURLをそのままコピー。または「共有」→「リンクをコピー」でもOK</div>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top:10px;padding:8px 10px;background:white;border-radius:6px;border:1px solid #C8DCFF;">
+                <div style="font-size:10px;font-weight:700;color:#888;margin-bottom:3px;">✅ このようなURLであればOK</div>
+                <div style="font-size:10px;color:#1A73E8;font-family:monospace;word-break:break-all;">https://maps.google.com/maps/place/店舗名/@緯度,経度...</div>
+                <div style="font-size:10px;color:#1A73E8;font-family:monospace;word-break:break-all;margin-top:2px;">https://maps.app.goo.gl/xxxxxxx</div>
+                <div style="font-size:10px;color:#1A73E8;font-family:monospace;word-break:break-all;margin-top:2px;">https://share.google/xxxxxxx</div>
+              </div>
+            </div>
 
             <!-- 実際のGBP診断結果サンプル（焼肉いたみ） -->
             <div style="margin-top:20px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">

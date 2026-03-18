@@ -72,6 +72,19 @@ def init_db():
             created_at TEXT NOT NULL
         )
     """)
+    # 営業メモテーブル
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sales_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gbp_analysis_id INTEGER,
+            business_name TEXT,
+            contact_email TEXT,
+            contact_phone TEXT,
+            note TEXT,
+            status TEXT DEFAULT 'new',
+            created_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -1814,16 +1827,112 @@ td{{padding:.75rem 1rem;border-top:1px solid #F1F3F4;font-size:.9rem}}
         html += f'<tr><td>{rid}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
     html += """</table>
 
-<h2>GBP診断ログ</h2>
+<h2>🏪 GBP診断ログ（営業リスト）</h2>
+<p style="font-size:.85rem;color:#5F6368;margin-bottom:.75rem;">診断した店舗に直接営業できます。「メモ追加」で連絡先・ステータスを管理。</p>
 <table>
-<tr><th>#</th><th>URL</th><th>ビジネス名</th><th>スコア</th><th>グレード</th><th>IP</th><th>日時</th></tr>
+<tr><th>#</th><th>ビジネス名</th><th>スコア</th><th>グレード</th><th>日時</th><th>アクション</th></tr>
 """
+    # 営業メモも取得
+    conn2 = sqlite3.connect(DB_PATH)
+    notes_map = {}
+    for n in conn2.execute("SELECT gbp_analysis_id, contact_email, contact_phone, note, status FROM sales_notes").fetchall():
+        notes_map[n[0]] = n
+    conn2.close()
+
     for r in gbp_rows:
         rid, url, bname, score, grade, ip, created_at = r
         grade_cls = (grade or "F")[0]
-        html += f'<tr><td>{rid}</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{url}</td><td>{bname or "-"}</td><td>{score or "-"}</td><td><span class="grade {grade_cls}">{grade or "-"}</span></td><td>{ip or "-"}</td><td>{created_at}</td></tr>'
-    html += "</table></body></html>"
+        note = notes_map.get(rid)
+        note_html = ""
+        if note:
+            status_color = {"new":"#1A73E8","contacted":"#FBBC04","closed":"#34A853"}.get(note[3],"#888")
+            note_html = f'<div style="font-size:.75rem;color:{status_color};margin-top:4px;">● {note[3]} {note[0] or ""} {note[1] or ""}</div>'
+        short_url = (url[:40] + "...") if url and len(url) > 40 else (url or "-")
+        html += f'''<tr>
+<td>{rid}</td>
+<td><strong>{bname or "-"}</strong><div style="font-size:.75rem;color:#888;overflow:hidden;text-overflow:ellipsis;max-width:200px">{short_url}</div>{note_html}</td>
+<td>{score or "-"}</td>
+<td><span class="grade {grade_cls}">{grade or "-"}</span></td>
+<td style="font-size:.8rem;color:#888">{created_at}</td>
+<td>
+  <button onclick="openNote({rid},'{(bname or '').replace("'","")}','{url.replace("'","")}')" style="background:#1A73E8;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.8rem">📝 メモ</button>
+  <a href="{url}" target="_blank" style="background:#f1f3f4;color:#333;padding:4px 8px;border-radius:4px;font-size:.8rem;text-decoration:none;margin-left:4px">🔗 URL</a>
+</td>
+</tr>'''
+    html += """</table>
+
+<!-- 営業メモモーダル -->
+<div id="noteModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:2rem;width:90%;max-width:480px">
+    <h3 id="modalTitle" style="margin-bottom:1rem;font-size:1.1rem"></h3>
+    <input id="noteEmail" type="email" placeholder="メールアドレス" style="width:100%;padding:.6rem;border:1px solid #ddd;border-radius:6px;margin-bottom:.75rem;font-size:.9rem">
+    <input id="notePhone" type="tel" placeholder="電話番号" style="width:100%;padding:.6rem;border:1px solid #ddd;border-radius:6px;margin-bottom:.75rem;font-size:.9rem">
+    <textarea id="noteText" placeholder="営業メモ（商談内容・次のアクションなど）" rows="3" style="width:100%;padding:.6rem;border:1px solid #ddd;border-radius:6px;margin-bottom:.75rem;font-size:.9rem;resize:vertical"></textarea>
+    <select id="noteStatus" style="width:100%;padding:.6rem;border:1px solid #ddd;border-radius:6px;margin-bottom:1rem;font-size:.9rem">
+      <option value="new">🔵 新規（未接触）</option>
+      <option value="contacted">🟡 接触済み</option>
+      <option value="closed">🟢 成約</option>
+    </select>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end">
+      <button onclick="closeNote()" style="background:#f1f3f4;border:none;padding:.6rem 1.2rem;border-radius:6px;cursor:pointer">キャンセル</button>
+      <button onclick="saveNote()" style="background:#1A73E8;color:white;border:none;padding:.6rem 1.2rem;border-radius:6px;cursor:pointer;font-weight:700">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentNoteId = null;
+function openNote(id, name, url) {
+  currentNoteId = id;
+  document.getElementById('modalTitle').textContent = '📝 営業メモ: ' + name;
+  document.getElementById('noteModal').style.display = 'flex';
+}
+function closeNote() { document.getElementById('noteModal').style.display = 'none'; }
+async function saveNote() {
+  const r = await fetch('/admin/save-note?token=""" + token + """', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id: currentNoteId,
+      email: document.getElementById('noteEmail').value,
+      phone: document.getElementById('notePhone').value,
+      note: document.getElementById('noteText').value,
+      status: document.getElementById('noteStatus').value
+    })
+  });
+  if (r.ok) { closeNote(); location.reload(); }
+}
+</script>
+</body></html>"""
     return html
+
+
+@app.route("/admin/save-note", methods=["POST"])
+def admin_save_note():
+    token = request.args.get("token", "")
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        abort(403)
+    data = request.get_json()
+    gbp_id = data.get("id")
+    email = data.get("email", "")
+    phone = data.get("phone", "")
+    note = data.get("note", "")
+    status = data.get("status", "new")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        # 既存メモがあれば更新、なければ挿入
+        existing = conn.execute("SELECT id FROM sales_notes WHERE gbp_analysis_id=?", (gbp_id,)).fetchone()
+        if existing:
+            conn.execute("UPDATE sales_notes SET contact_email=?,contact_phone=?,note=?,status=? WHERE gbp_analysis_id=?",
+                        (email, phone, note, status, gbp_id))
+        else:
+            conn.execute("INSERT INTO sales_notes (gbp_analysis_id,business_name,contact_email,contact_phone,note,status,created_at) VALUES (?,?,?,?,?,?,?)",
+                        (gbp_id, "", email, phone, note, status, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ===== 90日アクションプラン API =====
