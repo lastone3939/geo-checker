@@ -462,21 +462,47 @@ statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
     return call_gemini(prompt, retries=retries, backoff=backoff)
 
 
+def resolve_share_google(url: str) -> tuple:
+    """share.google URLをHTTPリダイレクト追跡で解決する
+    share.google → 302 → www.google.com/share.google?q=... → 301 → google.com/search?q=店名&kgmid=...
+    戻り値: (final_url, extracted_query)
+    """
+    from urllib.parse import parse_qs, unquote_plus
+    try:
+        # iPhoneのUser-Agentで2段階リダイレクトを追跡
+        session = requests.Session()
+        session.max_redirects = 10
+        r = session.get(
+            url,
+            allow_redirects=True,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"},
+        )
+        final_url = r.url
+        app.logger.info(f"share.google resolve: {url} → {final_url[:120]}")
+        parsed = urlparse(final_url)
+        qs = parse_qs(parsed.query)
+        # ?q= パラメータから店名を抽出（URLエンコード解除済み）
+        q = qs.get("q", [None])[0]
+        if q:
+            q = unquote_plus(q)
+        return final_url, q
+    except Exception as e:
+        app.logger.warning(f"share.google resolve failed: {e}")
+        return url, None
+
+
 def resolve_url(url: str) -> tuple:
     """短縮URLを最終URLに展開（share.google / maps.app.goo.gl 等）
     戻り値: (final_url, extracted_query) — extracted_queryは?q=パラメータの値
-
-    share.google はJSリダイレクトのため requests では追えない。
-    その場合は (元URL, None) を返し、呼び出し側でテキスト検索へフォールバックさせる。
     """
     from urllib.parse import parse_qs
     parsed = urlparse(url)
     host = parsed.netloc.lower()
 
-    # share.google は JS リダイレクト → HTTPリダイレクトでは追えないので元URLを返す
+    # share.google はiPhoneのUAでHTTPリダイレクトを追跡して解決
     if host == "share.google" or host.endswith(".share.google"):
-        app.logger.info(f"share.google URL検出 → HTTPリダイレクト展開をスキップ: {url}")
-        return url, None
+        return resolve_share_google(url)
 
     short_hosts = ["maps.app.goo.gl", "goo.gl", "g.page"]
     final_url = url
@@ -873,15 +899,13 @@ def scrape_gbp_photos(url: str, max_photos: int = 999) -> tuple:
         return [], None
 
     # 短縮URL（share.google / maps.app.goo.gl）を展開
-    orig_url = url
-    url, _ = resolve_url(url)
+    url, extracted_q = resolve_url(url)
     app.logger.info(f"resolve後URL: {url[:100]}")
 
-    # share.google の場合は URL からビジネス名を推定できないので
-    # Places APIのテキスト検索のみ使う（query=Noneのまま渡して呼び出し元で対処）
-    is_share_google = "share.google" in orig_url
-
     place_id, query, lat, lng = get_query_from_url(url)
+    # share.google 経由の場合は extracted_q（店名クエリ）をqueryに補完
+    if not query and extracted_q:
+        query = extracted_q
     url_business_name = query  # URLから抽出したビジネス名（検証用）
     photos = []
     verified_place_id = None
@@ -1218,25 +1242,9 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
             ANALYZE_JOBS[job_id]["status"] = "done"
 
         elif job_type == "gbp":
-            orig_url = url
             url, q_param = resolve_url(url)  # 短縮URL展開 + ?q=パラメータ抽出
-            is_share_google = "share.google" in orig_url
-
-            # share.google の場合はHTML取得不要（JSリダイレクトで取得できない）
-            # Place IDをテキスト検索で取得
-            if is_share_google:
-                # share.google: resolve_place_idはURL解析ではなくGoogle Places APIでテキスト検索
-                # q_paramがNoneなのでExtract不可 → GoogleのURLリダイレクト先を別途確認
-                # フォールバック: Places Text Search APIを使用（クエリは空でもURLに含まれるキーIDで検索）
-                # share.google の場合は places_id解決不可のため、
-                # ユーザーに正確な店名で検索させるよう promote
-                place_id, resolved_name = None, None
-                # share.google URLはHTML取得・Place ID解決ができないため
-                # analyze_gbp_with_geminiに渡すURLとして元のURLを使用
-                url = orig_url
-            else:
-                # Place IDを確実に解決（qパラメータ優先）
-                place_id, resolved_name = resolve_place_id(url, q_param)
+            # Place IDを確実に解決（qパラメータ優先）
+            place_id, resolved_name = resolve_place_id(url, q_param)
 
             ANALYZE_JOBS[job_id]["place_id"] = place_id
             ANALYZE_JOBS[job_id]["q_param"] = q_param
@@ -1244,16 +1252,13 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
             business_name = resolved_name or extract_business_name_from_url(url)
             ANALYZE_JOBS[job_id]["business_name"] = business_name
 
-            if is_share_google:
-                html_snippet = ""
-            else:
-                html_snippet = fetch_gmaps_page(url)
-                if html_snippet:
-                    soup = BeautifulSoup(html_snippet, "html.parser")
-                    if not business_name and soup.title and soup.title.string:
-                        m = re.match(r"^(.+?)\s*[-–]\s*Google", soup.title.string.strip())
-                        if m:
-                            business_name = m.group(1).strip()
+            html_snippet = fetch_gmaps_page(url)
+            if html_snippet:
+                soup = BeautifulSoup(html_snippet, "html.parser")
+                if not business_name and soup.title and soup.title.string:
+                    m = re.match(r"^(.+?)\s*[-–]\s*Google", soup.title.string.strip())
+                    if m:
+                        business_name = m.group(1).strip()
 
             result = analyze_gbp_with_gemini(url, business_name, html_snippet)
             result["analyzed_url"] = url
@@ -1526,20 +1531,10 @@ def video_download(job_id: str):
 
 
 def send_video_email(to_email: str, business_name: str, video_path: Path) -> bool:
-    """お客様へ動画をメールで送信"""
-    import smtplib, ssl
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
+    """お客様へ動画をメールで送信（Resend API優先 → SMTP フォールバック）"""
+    import base64
 
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = "清水 望（株式会社ZETTAI） <nozomu.shimizu@zettai.co.jp>"
-        msg['Reply-To'] = "nozomu.shimizu@zettai.co.jp"
-        msg['To'] = to_email
-        msg['Subject'] = f"【ZETT-AI】GBPスライドショー動画をお届けします｜株式会社ZETTAI"
-        body = f"""{business_name} 様
+    body_text = f"""{business_name} 様
 
 この度はZETT-AIをご利用いただきありがとうございます。
 
@@ -1569,19 +1564,68 @@ Email: nozomu.shimizu@zettai.co.jp
 HP: https://zettai.co.jp
 ━━━━━━━━━━━━━━━━━""".strip()
 
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    # --- Resend API（Railway無料プランのSMTPブロック回避）---
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+    if RESEND_API_KEY:
+        try:
+            with open(video_path, 'rb') as f:
+                video_b64 = base64.b64encode(f.read()).decode('utf-8')
+            payload = {
+                "from": "ZETT-AI <onboarding@resend.dev>",
+                "reply_to": "nozomu.shimizu@zettai.co.jp",
+                "to": [to_email],
+                "subject": "【ZETT-AI】GBPスライドショー動画をお届けします｜株式会社ZETTAI",
+                "text": body_text,
+                "attachments": [
+                    {
+                        "filename": "gbp_slideshow.mp4",
+                        "content": video_b64,
+                        "content_type": "video/mp4",
+                    }
+                ],
+            }
+            resp = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=30,
+            )
+            if resp.status_code in (200, 201):
+                app.logger.info(f"Resend送信成功: {to_email}")
+                return True
+            else:
+                app.logger.error(f"Resend error {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            app.logger.error(f"Resend exception: {e}")
+
+    # --- SMTP フォールバック（ローカル環境用）---
+    import smtplib, ssl
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders as email_encoders
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = "清水 望（株式会社ZETTAI） <nozomu.shimizu@zettai.co.jp>"
+        msg['Reply-To'] = "nozomu.shimizu@zettai.co.jp"
+        msg['To'] = to_email
+        msg['Subject'] = "【ZETT-AI】GBPスライドショー動画をお届けします｜株式会社ZETTAI"
+        msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
         with open(video_path, 'rb') as f:
             part = MIMEBase('video', 'mp4')
             part.set_payload(f.read())
-            encoders.encode_base64(part)
+            email_encoders.encode_base64(part)
             part.add_header('Content-Disposition', 'attachment; filename="gbp_slideshow.mp4"')
             msg.attach(part)
 
         ctx = ssl.create_default_context()
         if int(SMTP_PORT) == 587:
             with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT)) as server:
-                server.ehlo()
-                server.starttls(context=ctx)
+                server.ehlo(); server.starttls(context=ctx)
                 server.login(SMTP_USER, SMTP_PASS)
                 server.sendmail(SMTP_FROM, to_email, msg.as_bytes())
         else:
@@ -1589,10 +1633,10 @@ HP: https://zettai.co.jp
                 server.login(SMTP_USER, SMTP_PASS)
                 server.sendmail(SMTP_FROM, to_email, msg.as_bytes())
 
-        app.logger.info(f"メール送信成功: {to_email}")
+        app.logger.info(f"SMTP送信成功: {to_email}")
         return True
     except Exception as e:
-        app.logger.error(f"send_video_email error: {e}")
+        app.logger.error(f"send_video_email SMTP error: {e}")
         return False
 
 
