@@ -465,11 +465,20 @@ statusの基準: score 70以上=good, 50〜69=warning, 49以下=bad
 def resolve_url(url: str) -> tuple:
     """短縮URLを最終URLに展開（share.google / maps.app.goo.gl 等）
     戻り値: (final_url, extracted_query) — extracted_queryは?q=パラメータの値
+
+    share.google はJSリダイレクトのため requests では追えない。
+    その場合は (元URL, None) を返し、呼び出し側でテキスト検索へフォールバックさせる。
     """
     from urllib.parse import parse_qs
-    short_hosts = ["share.google", "maps.app.goo.gl", "goo.gl", "g.page"]
     parsed = urlparse(url)
     host = parsed.netloc.lower()
+
+    # share.google は JS リダイレクト → HTTPリダイレクトでは追えないので元URLを返す
+    if host == "share.google" or host.endswith(".share.google"):
+        app.logger.info(f"share.google URL検出 → HTTPリダイレクト展開をスキップ: {url}")
+        return url, None
+
+    short_hosts = ["maps.app.goo.gl", "goo.gl", "g.page"]
     final_url = url
     if any(host == h or host.endswith("." + h) for h in short_hosts):
         try:
@@ -864,8 +873,13 @@ def scrape_gbp_photos(url: str, max_photos: int = 999) -> tuple:
         return [], None
 
     # 短縮URL（share.google / maps.app.goo.gl）を展開
+    orig_url = url
     url, _ = resolve_url(url)
     app.logger.info(f"resolve後URL: {url[:100]}")
+
+    # share.google の場合は URL からビジネス名を推定できないので
+    # Places APIのテキスト検索のみ使う（query=Noneのまま渡して呼び出し元で対処）
+    is_share_google = "share.google" in orig_url
 
     place_id, query, lat, lng = get_query_from_url(url)
     url_business_name = query  # URLから抽出したビジネス名（検証用）
@@ -1119,25 +1133,28 @@ def create_slideshow_video(photo_paths: list, output_path: Path, duration: float
             app.logger.error(f"concat ffmpeg error: {r2.stderr[-300:]}")
             return False
 
-        # エフェクト処理
+        # エフェクト処理（店舗PR動画向け）
         if effect != "normal" and output_path.exists():
             tmp_path = output_path.parent / "tmp_base.mp4"
             import shutil; shutil.copy2(str(output_path), str(tmp_path))
 
-            # エフェクトのベースフィルター（明るさ・彩度調整）
-            base_filters = "eq=brightness=0.08:saturation=1.4:contrast=1.05"
+            # 彩度・明るさベースフィルター（店内を鮮やかに）
+            base_filters = "eq=brightness=0.06:saturation=1.5:contrast=1.08"
+            # キラキラ光点フィルター
             sparkle_filter = "geq=lum='min(255,lum(X\\,Y)+if(gt(random(1),0.9975),220,0))':cb='cb(X\\,Y)':cr='cr(X\\,Y)'"
 
             if effect == "sparkle":
-                # 基本キラキラエフェクト
-                effect_filters = f"{base_filters},{sparkle_filter}"
+                # 店内ツアー風 Ken Burns（ゆっくりズームイン）+ キラキラ
+                kb_filter = f"zoompan=z='min(zoom+0.0008,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={int(per_slide*fps)}:s=1280x720:fps={fps}"
+                effect_filters = f"{kb_filter},{base_filters},{sparkle_filter}"
             elif effect == "sparkle_fade":
-                # キラキラ + クロスフェードトランジション
-                effect_filters = f"{base_filters},{sparkle_filter}"
+                # ゆっくりパン（左→右）+ キラキラ（移動感を演出）
+                kb_filter = f"zoompan=z='1.08':x='(iw/2-(iw/zoom/2))+50*on/{int(per_slide*fps)}':y='ih/2-(ih/zoom/2)':d={int(per_slide*fps)}:s=1280x720:fps={fps}"
+                effect_filters = f"{kb_filter},{base_filters},{sparkle_filter}"
             elif effect == "sparkle_zoom":
-                # キラキラ + Ken Burnsエフェクト（軽いズームイン）
-                zoom_filter = "scale=1440:810,crop=1280:720:80*t/{duration}:45*t/{duration}".replace("{duration}", str(duration))
-                effect_filters = f"{zoom_filter},{base_filters},{sparkle_filter}"
+                # ズームアウト（全体が見えてくる演出）+ キラキラ（最も映える）
+                kb_filter = f"zoompan=z='max(zoom-0.0008,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={int(per_slide*fps)}:s=1280x720:fps={fps},scale=1280:720"
+                effect_filters = f"{kb_filter},{base_filters},{sparkle_filter}"
             else:
                 effect_filters = base_filters
 
@@ -1149,10 +1166,20 @@ def create_slideshow_video(photo_paths: list, output_path: Path, duration: float
                 str(output_path),
             ]
 
-            r3 = subprocess.run(effect_cmd, capture_output=True, text=True, timeout=120)
+            r3 = subprocess.run(effect_cmd, capture_output=True, text=True, timeout=180)
             if r3.returncode != 0:
-                app.logger.error(f"effect '{effect}' error: {r3.stderr[-200:]}")
-                shutil.copy2(str(tmp_path), str(output_path))
+                app.logger.error(f"effect '{effect}' error: {r3.stderr[-400:]}")
+                # エフェクト失敗時はベースフィルターのみで再試行
+                fallback_cmd = [
+                    "ffmpeg", "-y", "-i", str(tmp_path),
+                    "-vf", base_filters,
+                    "-c:v", "libx264", "-preset", "fast",
+                    "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                    str(output_path),
+                ]
+                r4 = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=120)
+                if r4.returncode != 0:
+                    shutil.copy2(str(tmp_path), str(output_path))
             try: tmp_path.unlink()
             except: pass
 
@@ -1191,22 +1218,43 @@ def run_analyze_job(job_id: str, url: str, job_type: str):
             ANALYZE_JOBS[job_id]["status"] = "done"
 
         elif job_type == "gbp":
+            orig_url = url
             url, q_param = resolve_url(url)  # 短縮URL展開 + ?q=パラメータ抽出
-            # Place IDを確実に解決（qパラメータ優先）
-            place_id, resolved_name = resolve_place_id(url, q_param)
+            is_share_google = "share.google" in orig_url
+
+            # share.google の場合はHTML取得不要（JSリダイレクトで取得できない）
+            # Place IDをテキスト検索で取得
+            if is_share_google:
+                # share.google: resolve_place_idはURL解析ではなくGoogle Places APIでテキスト検索
+                # q_paramがNoneなのでExtract不可 → GoogleのURLリダイレクト先を別途確認
+                # フォールバック: Places Text Search APIを使用（クエリは空でもURLに含まれるキーIDで検索）
+                # share.google の場合は places_id解決不可のため、
+                # ユーザーに正確な店名で検索させるよう promote
+                place_id, resolved_name = None, None
+                # share.google URLはHTML取得・Place ID解決ができないため
+                # analyze_gbp_with_geminiに渡すURLとして元のURLを使用
+                url = orig_url
+            else:
+                # Place IDを確実に解決（qパラメータ優先）
+                place_id, resolved_name = resolve_place_id(url, q_param)
+
             ANALYZE_JOBS[job_id]["place_id"] = place_id
             ANALYZE_JOBS[job_id]["q_param"] = q_param
 
             business_name = resolved_name or extract_business_name_from_url(url)
             ANALYZE_JOBS[job_id]["business_name"] = business_name
 
-            html_snippet = fetch_gmaps_page(url)
-            if html_snippet:
-                soup = BeautifulSoup(html_snippet, "html.parser")
-                if not business_name and soup.title and soup.title.string:
-                    m = re.match(r"^(.+?)\s*[-–]\s*Google", soup.title.string.strip())
-                    if m:
-                        business_name = m.group(1).strip()
+            if is_share_google:
+                html_snippet = ""
+            else:
+                html_snippet = fetch_gmaps_page(url)
+                if html_snippet:
+                    soup = BeautifulSoup(html_snippet, "html.parser")
+                    if not business_name and soup.title and soup.title.string:
+                        m = re.match(r"^(.+?)\s*[-–]\s*Google", soup.title.string.strip())
+                        if m:
+                            business_name = m.group(1).strip()
+
             result = analyze_gbp_with_gemini(url, business_name, html_snippet)
             result["analyzed_url"] = url
             if resolved_name:

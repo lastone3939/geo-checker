@@ -856,73 +856,10 @@
             </form>
             <p class="url-hint">対応: <code>google.com/maps/place/...</code> <code>maps.app.goo.gl</code> <code>g.page</code></p>
 
-            <!-- サンプルGBP診断結果 -->
-            <div style="margin-top:24px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
-              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">📍 実際の診断結果サンプル</p>
-              <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">※ 実際のGoogleマップURLを診断した結果です</p>
-
-              <!-- 実際の店舗診断結果 -->
-              <div style="background:white;border-radius:8px;padding:14px;border:1px solid #e1e5e9;margin-bottom:12px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                  <img src="https://maps.googleapis.com/maps/api/place/photo?maxwidth=40&photo_reference=sample" onerror="this.style.display='none'" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">
-                  <div style="flex:1;">
-                    <div style="font-size:13px;font-weight:700;color:#333;">スターバックス コーヒー 渋谷スクランブルスクエア店</div>
-                    <div style="font-size:11px;color:var(--muted);">東京都渋谷区 ☕ カフェ</div>
-                  </div>
-                  <div style="text-align:center;">
-                    <div style="background:#34a853;color:white;font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;margin-bottom:2px;">A</div>
-                    <div style="font-size:16px;font-weight:800;color:#34a853;">88点</div>
-                  </div>
-                </div>
-
-                <!-- カテゴリ別スコア -->
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px;">
-                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
-                    <div style="font-size:15px;">📋</div>
-                    <div>
-                      <div style="font-size:10px;font-weight:600;color:#2d7d46;">プロフィール完成度</div>
-                      <div style="font-size:13px;font-weight:700;color:#34a853;">95点</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
-                    <div style="font-size:15px;">📸</div>
-                    <div>
-                      <div style="font-size:10px;font-weight:600;color:#2d7d46;">写真・動画</div>
-                      <div style="font-size:13px;font-weight:700;color:#34a853;">91点</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#e6f4ea;border-radius:6px;">
-                    <div style="font-size:15px;">⭐</div>
-                    <div>
-                      <div style="font-size:10px;font-weight:600;color:#2d7d46;">クチコミ管理</div>
-                      <div style="font-size:13px;font-weight:700;color:#34a853;">87点</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fef7e0;border-radius:6px;">
-                    <div style="font-size:15px;">🎯</div>
-                    <div>
-                      <div style="font-size:10px;font-weight:600;color:#b45309;">ローカルSEO</div>
-                      <div style="font-size:13px;font-weight:700;color:#f59e0b;">74点</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 改善ポイント例 -->
-                <div style="margin-top:10px;padding:10px;background:#FEF7E0;border-radius:6px;border-left:3px solid #F59E0B;">
-                  <div style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;">💡 AI改善提案（抜粋）</div>
-                  <div style="font-size:11px;color:#78350F;line-height:1.7;">
-                    ・ローカルキーワードを営業時間の説明文に追加<br>
-                    ・動画コンテンツがなし → 追加でAI検索評価UP<br>
-                    ・クチコミ返信率 68% → 90%以上を目指す
-                  </div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
-                <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 6項目AI診断</span>
-                <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 具体的な改善提案</span>
-                <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 90日改善プラン</span>
-              </div>
+            <div style="margin-top:16px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+              <span style="background:#E8F0FE;color:#1A73E8;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 6項目AI診断</span>
+              <span style="background:#E6F4EA;color:#34A853;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 具体的な改善提案</span>
+              <span style="background:#FEF7E0;color:#F59E0B;font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600;">✅ 90日改善プラン</span>
             </div>
           </div>
         </div>
@@ -967,16 +904,16 @@
             <!-- スタイル選択ボタン -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;">
               <button type="button" id="btnNormal" onclick="startVideoWithStyle('normal')" style="padding:12px 14px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
-                🎬 ノーマル
+                🎬 シンプル
               </button>
               <button type="button" id="btnSparkle" onclick="startVideoWithStyle('sparkle')" style="padding:12px 14px;background:linear-gradient(135deg,#FF6B9D,#C44AFF);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
-                ✨ キラキラ
+                ✨ 店内ツアー風
               </button>
               <button type="button" id="btnSparkleFade" onclick="startVideoWithStyle('sparkle_fade')" style="padding:12px 14px;background:linear-gradient(135deg,#FFB347,#FFCC02);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
-                🌟 キラ+フェード
+                🌟 パノラマ演出
               </button>
               <button type="button" id="btnSparkleZoom" onclick="startVideoWithStyle('sparkle_zoom')" style="padding:12px 14px;background:linear-gradient(135deg,#9D50BB,#6F42C1);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
-                🔍 キラ+ズーム
+                🔍 ドラマチック
               </button>
             </div>
 
