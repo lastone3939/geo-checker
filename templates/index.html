@@ -146,6 +146,25 @@
     .tab-content { display: none; padding: 0 0 32px; }
     .tab-content.active { display: block; }
 
+    /* 問い合わせフォーム営業タブ用 */
+    .inq-input {
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px; background: #fff; font-family: inherit; width: 100%;
+      box-sizing: border-box;
+    }
+    .inq-input:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+    .inq-status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 700;
+    }
+    .inq-status-sent { background: #E6F4EA; color: #1E8E3E; }
+    .inq-status-preview { background: #E8F0FE; color: #1A73E8; }
+    .inq-status-no_form { background: #FEF7E0; color: #B06000; }
+    .inq-status-captcha { background: #FCE8E6; color: #C5221F; }
+    .inq-status-failed { background: #FCE8E6; color: #C5221F; }
+    .inq-status-skipped { background: #F1F3F4; color: #5F6368; }
+    .inq-status-sent_unknown { background: #E8F0FE; color: #1A73E8; }
+
     /* 入力フォーム */
     .form-wrap {
       display: flex; gap: 8px;
@@ -811,6 +830,7 @@
           <button class="tab-btn" data-tab="gbp">📍 GBP</button>
           <button class="tab-btn" data-tab="chat">💬 チャット</button>
           <button class="tab-btn" data-tab="video">🎬 動画</button>
+          <button class="tab-btn" data-tab="inquiry">📬 フォーム営業</button>
         </div>
 
         <div id="tabWeb" class="tab-content active">
@@ -1103,6 +1123,129 @@
 
           </div>
         </div>
+
+        <div id="tabInquiry" class="tab-content">
+          <div style="padding-top:20px;">
+            <div style="text-align:center;margin-bottom:16px;">
+              <p style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;">
+                問い合わせフォーム営業を自動化
+              </p>
+              <p style="font-size:13px;color:var(--text-sub);">
+                対象企業のURLを貼り付けるだけ。フォームを自動検出・自動入力・一括送信。
+              </p>
+            </div>
+
+            <!-- ステップ1: 営業テンプレート -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">① 営業テンプレートを入力</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  お名前 <span style="color:#EA4335;">*</span>
+                  <input type="text" id="inqName" placeholder="清水 望" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  ふりがな
+                  <input type="text" id="inqKana" placeholder="しみず のぞむ" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  会社名
+                  <input type="text" id="inqCompany" placeholder="株式会社ZETTAI" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  部署/役職
+                  <input type="text" id="inqDepartment" placeholder="営業部" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  メールアドレス <span style="color:#EA4335;">*</span>
+                  <input type="email" id="inqEmail" placeholder="sales@zettai.co.jp" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  電話番号
+                  <input type="tel" id="inqPhone" placeholder="080-1234-5678" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  自社URL
+                  <input type="url" id="inqUrl" placeholder="https://zettai.co.jp" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  住所
+                  <input type="text" id="inqAddress" placeholder="東京都..." class="inq-input">
+                </label>
+              </div>
+              <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;margin-top:10px;">
+                件名
+                <input type="text" id="inqSubject" placeholder="AI検索対策（GEO）のご提案" class="inq-input">
+              </label>
+              <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;margin-top:10px;">
+                本文 <span style="color:#EA4335;">*</span>
+                <textarea id="inqMessage" rows="6" class="inq-input" placeholder="突然のご連絡失礼いたします。株式会社ZETTAIの清水と申します。..."></textarea>
+              </label>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button type="button" onclick="saveInquiryTemplate()" style="flex:1;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">💾 テンプレート保存</button>
+                <button type="button" onclick="loadInquiryTemplate()" style="flex:1;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📥 読込</button>
+              </div>
+            </div>
+
+            <!-- ステップ2: 対象URL -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">② 送信先URLを貼り付け（1行に1つ / 最大200件）</p>
+              <textarea id="inqUrls" rows="8" class="inq-input" placeholder="https://example.com&#10;https://example.co.jp&#10;https://another-site.jp"></textarea>
+              <div id="inqUrlCount" style="font-size:11px;color:var(--muted);margin-top:6px;">0 件</div>
+            </div>
+
+            <!-- ステップ3: 実行オプション -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">③ 実行オプション</p>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+                <input type="checkbox" id="inqDryRun" checked>
+                <span>プレビューのみ（ドライラン：実際には送信しない）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);">
+                送信間隔
+                <input type="number" id="inqDelay" value="5" min="0" max="60" step="1" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+                <span style="font-size:12px;color:var(--text-sub);">秒（相手サイトへの負荷軽減）</span>
+              </label>
+            </div>
+
+            <button type="button" id="inqSubmitBtn" onclick="startInquiryCampaign()" class="submit-btn" style="width:100%;padding:14px;font-size:15px;">
+              🚀 一括実行スタート
+            </button>
+
+            <!-- 進捗表示 -->
+            <div id="inqProgressArea" style="display:none;margin-top:16px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div style="width:18px;height:18px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <span id="inqProgressText" style="font-size:14px;font-weight:600;">処理中...</span>
+                <button type="button" onclick="cancelInquiryCampaign()" id="inqCancelBtn" style="margin-left:auto;padding:4px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;">中止</button>
+              </div>
+              <div style="background:#E8EAED;border-radius:4px;height:6px;overflow:hidden;">
+                <div id="inqProgressBar" style="height:100%;background:var(--primary);border-radius:4px;width:0%;transition:width 0.3s ease;"></div>
+              </div>
+            </div>
+
+            <!-- 結果サマリー -->
+            <div id="inqSummary" style="display:none;margin-top:14px;padding:12px;background:#E8F0FE;border:1px solid #1A73E8;border-radius:10px;font-size:13px;color:#174EA6;"></div>
+
+            <!-- 結果テーブル -->
+            <div id="inqResultWrap" style="display:none;margin-top:14px;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#F1F3F4;">
+                    <th style="text-align:left;padding:8px;border:1px solid var(--border);">URL</th>
+                    <th style="padding:8px;border:1px solid var(--border);width:110px;">ステータス</th>
+                    <th style="padding:8px;border:1px solid var(--border);width:80px;">詳細</th>
+                  </tr>
+                </thead>
+                <tbody id="inqResultBody"></tbody>
+              </table>
+            </div>
+
+            <p style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.6;">
+              ※ 相手サイトのrobots.txt/利用規約を尊重し、過度な連投は避けてください。本ツールはCAPTCHA設置フォームをスキップします。
+            </p>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1609,7 +1752,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
   if (btn) btn.classList.add('active');
-  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo' };
+  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo', inquiry: 'tabInquiry' };
   const tabEl = document.getElementById(tabIds[tab] || 'tabWeb');
   if (tabEl) tabEl.classList.add('active');
 
@@ -2547,6 +2690,203 @@ async function sendChatMessageText(msg) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// ===== 問い合わせフォーム営業 自動化 =====
+const INQUIRY_TEMPLATE_KEY = 'zettai_inquiry_template_v1';
+let inquiryJobId = null;
+let inquiryPollTimer = null;
+
+function collectInquiryTemplate() {
+  return {
+    name: (document.getElementById('inqName').value || '').trim(),
+    kana: (document.getElementById('inqKana').value || '').trim(),
+    company: (document.getElementById('inqCompany').value || '').trim(),
+    department: (document.getElementById('inqDepartment').value || '').trim(),
+    email: (document.getElementById('inqEmail').value || '').trim(),
+    phone: (document.getElementById('inqPhone').value || '').trim(),
+    url: (document.getElementById('inqUrl').value || '').trim(),
+    address: (document.getElementById('inqAddress').value || '').trim(),
+    subject: (document.getElementById('inqSubject').value || '').trim(),
+    message: (document.getElementById('inqMessage').value || '').trim(),
+  };
+}
+
+function saveInquiryTemplate() {
+  try {
+    localStorage.setItem(INQUIRY_TEMPLATE_KEY, JSON.stringify(collectInquiryTemplate()));
+    alert('テンプレートを保存しました');
+  } catch (e) {
+    alert('保存に失敗しました: ' + e.message);
+  }
+}
+
+function loadInquiryTemplate() {
+  try {
+    const raw = localStorage.getItem(INQUIRY_TEMPLATE_KEY);
+    if (!raw) { alert('保存されたテンプレートがありません'); return; }
+    const t = JSON.parse(raw);
+    const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+    setV('inqName', t.name); setV('inqKana', t.kana); setV('inqCompany', t.company);
+    setV('inqDepartment', t.department); setV('inqEmail', t.email); setV('inqPhone', t.phone);
+    setV('inqUrl', t.url); setV('inqAddress', t.address); setV('inqSubject', t.subject);
+    setV('inqMessage', t.message);
+  } catch (e) { alert('読込に失敗しました: ' + e.message); }
+}
+
+function parseInquiryUrls() {
+  const raw = document.getElementById('inqUrls').value || '';
+  return raw.split(/[\r\n,、\s]+/).map(s => s.trim()).filter(Boolean);
+}
+
+function updateInquiryUrlCount() {
+  const urls = parseInquiryUrls();
+  const el = document.getElementById('inqUrlCount');
+  if (el) el.textContent = urls.length + ' 件';
+}
+
+let inquiryLatestResults = [];
+function renderInquiryResults(results) {
+  inquiryLatestResults = results;
+  const body = document.getElementById('inqResultBody');
+  const wrap = document.getElementById('inqResultWrap');
+  if (!body || !wrap) return;
+  if (!results.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const labelMap = {
+    sent: '✅ 送信完了', sent_unknown: '🔵 送信OK?', preview: '👁 プレビュー',
+    no_form: '⚠️ フォーム無し', captcha: '🛡 CAPTCHA', skipped: '⏭ スキップ',
+    failed: '❌ 失敗',
+  };
+  body.innerHTML = results.map((r, idx) => {
+    const cls = 'inq-status-' + (r.status || 'failed');
+    const label = labelMap[r.status] || r.status;
+    const err = r.error ? `<div style="color:#C5221F;font-size:11px;margin-top:4px;">${escapeHtml(r.error)}</div>` : '';
+    const formUrl = r.form_url ? `<div style="color:#5F6368;font-size:11px;margin-top:2px;">form: ${escapeHtml(r.form_url)}</div>` : '';
+    return `
+      <tr>
+        <td style="padding:8px;border:1px solid var(--border);word-break:break-all;">
+          <a href="${escapeHtml(r.target_url)}" target="_blank" rel="noopener" style="color:#1A73E8;text-decoration:none;">${escapeHtml(r.target_url)}</a>
+          ${formUrl}${err}
+        </td>
+        <td style="padding:8px;border:1px solid var(--border);text-align:center;"><span class="inq-status-badge ${cls}">${label}</span></td>
+        <td style="padding:8px;border:1px solid var(--border);text-align:center;">
+          <button type="button" onclick="showInquiryDetail(${idx})" style="padding:4px 8px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;">詳細</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function showInquiryDetail(idx) {
+  const r = inquiryLatestResults[idx];
+  if (!r) return;
+  const lines = [];
+  lines.push('対象URL: ' + r.target_url);
+  if (r.form_url) lines.push('フォームURL: ' + r.form_url);
+  lines.push('ステータス: ' + r.status);
+  if (r.http_status) lines.push('HTTP: ' + r.http_status);
+  if (r.error) lines.push('エラー: ' + r.error);
+  if (r.detected_fields && r.detected_fields.length) {
+    lines.push('\n検出フィールド:');
+    r.detected_fields.forEach(f => lines.push(`  - ${f.name} [${f.category}] ${f.filled ? '✓' : '×'}`));
+  }
+  if (r.submission_data) {
+    lines.push('\n送信データ:');
+    Object.entries(r.submission_data).forEach(([k, v]) => {
+      const val = typeof v === 'string' && v.length > 80 ? v.slice(0, 80) + '…' : v;
+      lines.push(`  ${k} = ${val}`);
+    });
+  }
+  alert(lines.join('\n'));
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+async function startInquiryCampaign() {
+  const template = collectInquiryTemplate();
+  const urls = parseInquiryUrls();
+  const dryRun = document.getElementById('inqDryRun').checked;
+  const delay = parseFloat(document.getElementById('inqDelay').value || '5');
+
+  if (!urls.length) { alert('対象URLを1件以上入力してください'); return; }
+  if (!dryRun) {
+    const missing = [];
+    if (!template.name) missing.push('お名前');
+    if (!template.email) missing.push('メールアドレス');
+    if (!template.message) missing.push('本文');
+    if (missing.length) { alert('本番送信には次の項目が必須です: ' + missing.join(', ')); return; }
+    if (!confirm(`${urls.length} 件のフォームに実際に送信します。よろしいですか？`)) return;
+  }
+
+  const btn = document.getElementById('inqSubmitBtn');
+  btn.disabled = true;
+  document.getElementById('inqProgressArea').style.display = 'block';
+  document.getElementById('inqProgressText').textContent = '送信開始中...';
+  document.getElementById('inqProgressBar').style.width = '0%';
+  document.getElementById('inqSummary').style.display = 'none';
+  document.getElementById('inqResultBody').innerHTML = '';
+  document.getElementById('inqResultWrap').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/inquiry/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template, urls, dry_run: dryRun, delay_seconds: delay }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { throw new Error(data.error || '開始に失敗しました'); }
+    inquiryJobId = data.job_id;
+    pollInquiryStatus();
+  } catch (e) {
+    alert('エラー: ' + e.message);
+    btn.disabled = false;
+    document.getElementById('inqProgressArea').style.display = 'none';
+  }
+}
+
+async function pollInquiryStatus() {
+  if (!inquiryJobId) return;
+  try {
+    const resp = await fetch('/api/inquiry/status/' + inquiryJobId);
+    const data = await resp.json();
+    if (!resp.ok) { throw new Error(data.error || 'ステータス取得失敗'); }
+    const pct = data.total > 0 ? Math.round((data.progress / data.total) * 100) : 0;
+    document.getElementById('inqProgressBar').style.width = pct + '%';
+    document.getElementById('inqProgressText').textContent =
+      `処理中... ${data.progress} / ${data.total} 件 (${pct}%)`;
+    renderInquiryResults(data.results || []);
+
+    if (data.status === 'done' || data.status === 'error') {
+      clearTimeout(inquiryPollTimer);
+      document.getElementById('inqSubmitBtn').disabled = false;
+      document.getElementById('inqProgressArea').style.display = 'none';
+      const results = data.results || [];
+      const counts = {};
+      results.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+      const parts = Object.entries(counts).map(([k, v]) => `${k}: ${v}`);
+      const sum = document.getElementById('inqSummary');
+      sum.style.display = 'block';
+      sum.innerHTML = `✨ 処理完了（合計 ${results.length} 件）— ${parts.join(' / ')}`;
+      inquiryJobId = null;
+    } else {
+      inquiryPollTimer = setTimeout(pollInquiryStatus, 2000);
+    }
+  } catch (e) {
+    document.getElementById('inqProgressText').textContent = 'エラー: ' + e.message;
+    document.getElementById('inqSubmitBtn').disabled = false;
+  }
+}
+
+async function cancelInquiryCampaign() {
+  if (!inquiryJobId) return;
+  if (!confirm('このキャンペーンを中止しますか？')) return;
+  try {
+    await fetch('/api/inquiry/cancel/' + inquiryJobId, { method: 'POST' });
+  } catch (e) {}
+}
+
 // タブボタンにクリックイベントを設定（タッチ対応）
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -2563,6 +2903,16 @@ document.addEventListener('DOMContentLoaded', function() {
       if (tab) switchTab(tab);
     });
   });
+  // 問い合わせフォーム営業タブの初期化
+  const urlsBox = document.getElementById('inqUrls');
+  if (urlsBox) {
+    urlsBox.addEventListener('input', updateInquiryUrlCount);
+    updateInquiryUrlCount();
+  }
+  // 前回保存したテンプレートがあれば自動復元
+  try {
+    if (localStorage.getItem(INQUIRY_TEMPLATE_KEY)) loadInquiryTemplate();
+  } catch (e) {}
   console.log('Tab listeners initialized');
 });
 

@@ -85,6 +85,35 @@ def init_db():
             created_at TEXT NOT NULL
         )
     """)
+    # 問い合わせフォーム営業 キャンペーン
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT UNIQUE,
+            template_json TEXT,
+            total_urls INTEGER DEFAULT 0,
+            success_count INTEGER DEFAULT 0,
+            failure_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            dry_run INTEGER DEFAULT 1,
+            ip TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # 問い合わせフォーム営業 個別送信結果
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER,
+            target_url TEXT,
+            form_url TEXT,
+            status TEXT,
+            detected_fields_json TEXT,
+            error_message TEXT,
+            http_status INTEGER,
+            submitted_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -1364,6 +1393,588 @@ def run_video_job(job_id: str, url: str, effect: str = "normal"):
         app.logger.error(f"video job error: {e}")
 
 
+# ===================================================================
+# 問い合わせフォーム営業 自動化エンジン
+# ===================================================================
+
+INQUIRY_JOBS = {}  # job_id -> {status, progress, total, results, error, created_at}
+
+INQUIRY_CONTACT_PATHS = [
+    "/contact", "/contact/", "/contact.html", "/contact.php",
+    "/contactus", "/contactus/", "/contact-us", "/contact-us/",
+    "/inquiry", "/inquiry/", "/inquiry.html", "/inquiry.php",
+    "/form", "/form/", "/form.html",
+    "/otoiawase", "/otoiawase/", "/toiawase", "/toiawase/",
+    "/support", "/support/contact", "/help/contact",
+    "/ja/contact", "/ja/inquiry",
+]
+
+INQUIRY_CONTACT_KEYWORDS = [
+    "お問い合わせ", "お問合せ", "お問合わせ", "問い合わせ", "問合せ",
+    "ご相談", "お見積", "見積り", "資料請求",
+    "contact", "inquiry", "inquiries", "enquiry", "support",
+    "get in touch", "reach us", "reach out",
+]
+
+FIELD_PATTERNS = {
+    # 複合ラベル（"会社名"の"名"を"名前"に誤分類しないよう、特異的なものを先に評価）
+    "email_confirm": [r"メール.*確認", r"確認.*メール", r"email.*confirm", r"confirm.*email"],
+    "company": [
+        r"会社名", r"企業名", r"法人名", r"団体名", r"組織名", r"貴社名", r"社名", r"屋号",
+        r"\bcompany\b", r"corporation", r"organization", r"organisation",
+    ],
+    "department": [r"部署", r"所属", r"部門", r"department", r"division"],
+    "position": [r"役職", r"\btitle\b", r"position", r"job[-_ ]?title"],
+    "subject": [
+        r"件名", r"タイトル", r"題名", r"用件",
+        r"subject", r"title", r"\btopic\b",
+    ],
+    "category": [r"種別", r"カテゴリ", r"ご用件", r"お問い合わせ種別", r"inquiry[-_ ]?type", r"category"],
+    "zip": [r"郵便番号", r"〒", r"zip", r"postal"],
+    "address": [r"住所", r"所在地", r"address", r"addr"],
+    "url": [r"URL", r"ウェブ", r"ホームページ", r"サイト", r"website", r"web_?site", r"homepage"],
+    "fax": [r"FAX", r"ファックス", r"ファクス"],
+    "email": [r"メール", r"e[-_ ]?mail", r"mailaddress", r"mail_addr"],
+    "phone": [
+        r"電話", r"TEL", r"tel_?no", r"phone", r"mobile", r"携帯",
+        r"連絡先(?!.*メール)",
+    ],
+    "kana": [r"ふりがな", r"フリガナ", r"カナ", r"kana", r"furigana"],
+    # 氏名系（より限定的なパターン）
+    "name": [
+        r"お名前", r"名前", r"氏名", r"ご担当者", r"担当者名", r"担当者", r"姓名",
+        r"\bname\b", r"your[-_ ]?name", r"full[-_ ]?name", r"fullname",
+        r"contact[-_ ]?name", r"user[-_ ]?name",
+    ],
+    "last_name": [r"^姓$", r"苗字", r"\bsei\b", r"last[-_ ]?name", r"family[-_ ]?name"],
+    "first_name": [r"first[-_ ]?name", r"given[-_ ]?name", r"\bmei\b"],
+    # 本文系は最後（"内容"が"会社名"後に来るように）
+    "message": [
+        r"本文", r"メッセージ", r"お問い合わせ内容", r"問い合わせ内容",
+        r"ご相談内容", r"ご要望", r"ご質問", r"コメント", r"備考",
+        r"お問い合わせ", r"問い合わせ",
+        r"message", r"inquiry", r"content", r"\bbody\b", r"comment",
+        r"detail", r"description", r"remark",
+        r"^内容$", r"内容\b",
+    ],
+    "agree": [r"同意", r"承諾", r"承認", r"プライバシー", r"個人情報", r"privacy", r"agree", r"consent", r"terms"],
+}
+
+CAPTCHA_SIGNATURES = [
+    "g-recaptcha", "h-captcha", "hcaptcha", "cf-turnstile", "turnstile",
+    "data-sitekey", "recaptcha/api.js", "hcaptcha.com/1/api.js",
+    "challenges.cloudflare.com",
+]
+
+INQUIRY_SUCCESS_MARKERS = [
+    "ありがとうございました", "ありがとうございます", "送信が完了", "送信完了",
+    "受け付けました", "受付けました", "受け付け完了", "送信されました",
+    "thank you", "thanks for", "we have received", "successfully sent",
+    "message sent", "submission received",
+]
+INQUIRY_CONFIRM_MARKERS = [
+    "確認画面", "入力内容の確認", "ご確認ください", "内容をご確認", "確認してください",
+    "confirm", "confirmation", "please confirm", "review your",
+]
+
+
+def _html_text_lower(element):
+    try:
+        return element.get_text(" ", strip=True).lower()
+    except Exception:
+        return ""
+
+
+def find_inquiry_form_page(base_url: str, session: requests.Session):
+    """トップページ→共通パス→リンク文字列から問い合わせフォームのURLを探す"""
+    parsed = urlparse(base_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+
+    candidates = []
+
+    # 1) トップページをパースしてリンクを収集
+    try:
+        resp = session.get(base_url, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
+        if resp.status_code == 200:
+            resp.encoding = resp.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                href = a.get("href", "").strip()
+                if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+                    continue
+                label = (a.get_text(" ", strip=True) or "") + " " + href
+                label_lower = label.lower()
+                for kw in INQUIRY_CONTACT_KEYWORDS:
+                    if kw.lower() in label_lower:
+                        full = urljoin(base_url, href)
+                        if urlparse(full).netloc == parsed.netloc:
+                            candidates.append(full)
+                        break
+    except Exception:
+        pass
+
+    # 2) 共通パスを総当たり
+    for path in INQUIRY_CONTACT_PATHS:
+        candidates.append(urljoin(root, path))
+
+    # 重複排除（順序維持）
+    seen = set()
+    unique = []
+    for u in candidates:
+        if u not in seen:
+            seen.add(u)
+            unique.append(u)
+
+    # 3) <form> を含む最初のページを採用
+    for candidate in unique[:20]:
+        try:
+            if not is_safe_url(candidate):
+                continue
+            r = session.get(candidate, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
+            if r.status_code != 200:
+                continue
+            r.encoding = r.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(r.text, "html.parser")
+            forms = soup.find_all("form")
+            for form in forms:
+                # 明らかに検索フォームは除外
+                if _looks_like_search_form(form):
+                    continue
+                # textarea または message系 input があるフォームを採用
+                if form.find("textarea") or len(form.find_all(["input", "textarea"])) >= 3:
+                    return r.url, r.text, form
+    # テキストエリアがないが3件以上の場合も採用（検討済み）
+        except Exception:
+            continue
+
+    return None, None, None
+
+
+def _looks_like_search_form(form) -> bool:
+    action = (form.get("action") or "").lower()
+    if "search" in action or "?s=" in action:
+        return True
+    inputs = form.find_all("input")
+    if len(inputs) <= 2 and not form.find("textarea"):
+        names = " ".join((i.get("name") or "") for i in inputs).lower()
+        if "search" in names or "keyword" in names or names.strip() in ("q", "s"):
+            return True
+    return False
+
+
+def _field_label_text(field, soup) -> str:
+    """input/textarea/selectに紐づくlabelやplaceholderを集約"""
+    parts = []
+    for attr in ("name", "id", "placeholder", "aria-label", "title"):
+        v = field.get(attr)
+        if v:
+            parts.append(str(v))
+    field_id = field.get("id")
+    if field_id:
+        lbl = soup.find("label", attrs={"for": field_id})
+        if lbl:
+            parts.append(lbl.get_text(" ", strip=True))
+    parent_label = field.find_parent("label")
+    if parent_label:
+        parts.append(parent_label.get_text(" ", strip=True))
+    # 直前のth/dt/div のテキストも拾う
+    row = field.find_parent(["tr", "dl", "li", "div"])
+    if row:
+        head = row.find(["th", "dt"])
+        if head:
+            parts.append(head.get_text(" ", strip=True))
+    return " ".join(parts)
+
+
+def classify_field(label_blob: str) -> str:
+    """フィールドのラベル情報から意味カテゴリを判定"""
+    text = (label_blob or "").lower()
+    if not text:
+        return ""
+    for category, patterns in FIELD_PATTERNS.items():
+        for pat in patterns:
+            if re.search(pat, text, re.IGNORECASE):
+                return category
+    return ""
+
+
+def parse_form(html: str, form_url: str):
+    """フォーム構造を解析して送信可能な情報を返す"""
+    soup = BeautifulSoup(html, "html.parser")
+    # CAPTCHA検出
+    lower_html = html.lower()
+    captcha_hit = any(sig in lower_html for sig in CAPTCHA_SIGNATURES)
+
+    # 最も妥当なformを選択（search除外・textarea優先）
+    forms = soup.find_all("form")
+    target_form = None
+    for form in forms:
+        if _looks_like_search_form(form):
+            continue
+        if form.find("textarea"):
+            target_form = form
+            break
+    if target_form is None:
+        for form in forms:
+            if not _looks_like_search_form(form) and len(form.find_all(["input", "textarea"])) >= 3:
+                target_form = form
+                break
+    if target_form is None:
+        return None
+
+    action = target_form.get("action") or form_url
+    action = urljoin(form_url, action)
+    method = (target_form.get("method") or "get").lower()
+    enctype = (target_form.get("enctype") or "application/x-www-form-urlencoded").lower()
+
+    fields = []
+    for elem in target_form.find_all(["input", "textarea", "select"]):
+        name = elem.get("name")
+        if not name:
+            continue
+        tag = elem.name
+        input_type = (elem.get("type") or "").lower() if tag == "input" else tag
+        label_blob = _field_label_text(elem, soup)
+        category = classify_field(label_blob + " " + name)
+
+        options = []
+        if tag == "select":
+            for opt in elem.find_all("option"):
+                options.append({
+                    "value": opt.get("value") if opt.get("value") is not None else opt.get_text(strip=True),
+                    "text": opt.get_text(strip=True),
+                    "selected": opt.has_attr("selected"),
+                })
+
+        fields.append({
+            "name": name,
+            "tag": tag,
+            "type": input_type,
+            "value": elem.get("value", ""),
+            "required": elem.has_attr("required"),
+            "label": label_blob[:200],
+            "category": category,
+            "options": options,
+            "checked": elem.has_attr("checked"),
+        })
+
+    return {
+        "action": action,
+        "method": method,
+        "enctype": enctype,
+        "fields": fields,
+        "has_captcha": captcha_hit,
+    }
+
+
+def _choose_select_value(field: dict, template: dict) -> str:
+    """selectの適切な選択肢を決定"""
+    options = field.get("options") or []
+    if not options:
+        return ""
+    category = field.get("category", "")
+    # カテゴリ系はテンプレートの inquiry_category を使う、合致候補から選ぶ
+    if category == "category":
+        desired = (template.get("inquiry_category") or "").lower()
+        for opt in options:
+            text = (opt.get("text") or "").lower()
+            if desired and desired in text:
+                return opt["value"]
+        for opt in options:
+            text = (opt.get("text") or "")
+            if any(kw in text for kw in ["その他", "ご相談", "お問い合わせ", "一般", "営業", "サービス"]):
+                return opt["value"]
+    # デフォルト: 選択済み → 先頭の非空
+    for opt in options:
+        if opt.get("selected"):
+            return opt["value"]
+    for opt in options:
+        v = opt.get("value")
+        t = (opt.get("text") or "").strip()
+        if v and v.strip() and t and t not in ("選択してください", "--", "---", "please select"):
+            return v
+    return options[0]["value"] if options else ""
+
+
+def build_submission_data(form_info: dict, template: dict) -> tuple:
+    """フォーム情報とテンプレートから送信データを構築"""
+    data = {}
+    mapping = []
+    template_map = {
+        "name": template.get("name", ""),
+        "kana": template.get("kana", ""),
+        "last_name": template.get("last_name") or (template.get("name", "").split(" ")[0] if template.get("name") else ""),
+        "first_name": template.get("first_name") or (template.get("name", "").split(" ", 1)[1] if " " in template.get("name", "") else ""),
+        "company": template.get("company", ""),
+        "department": template.get("department", ""),
+        "position": template.get("position", ""),
+        "email": template.get("email", ""),
+        "email_confirm": template.get("email", ""),
+        "phone": template.get("phone", ""),
+        "fax": template.get("fax", ""),
+        "zip": template.get("zip", ""),
+        "address": template.get("address", ""),
+        "url": template.get("url", ""),
+        "subject": template.get("subject", ""),
+        "message": template.get("message", ""),
+    }
+    # radio/checkbox は同名のグループ単位で処理するため、最後の値が勝つ仕様をうまく使う
+    radio_groups = {}
+    for f in form_info["fields"]:
+        if f["type"] == "radio":
+            radio_groups.setdefault(f["name"], []).append(f)
+
+    for f in form_info["fields"]:
+        name = f["name"]
+        tag = f["tag"]
+        type_ = f["type"]
+        category = f["category"]
+
+        if type_ in ("submit", "button", "image", "reset", "file"):
+            continue
+
+        if type_ == "hidden":
+            data[name] = f["value"]
+            continue
+
+        if tag == "textarea":
+            # textareaは基本 message として扱う（category優先）
+            val = template_map.get(category) if category in template_map else None
+            data[name] = val or template_map["message"]
+            mapping.append({"name": name, "category": category or "message", "filled": True})
+            continue
+
+        if tag == "select":
+            data[name] = _choose_select_value(f, template)
+            mapping.append({"name": name, "category": category or "select", "filled": bool(data[name])})
+            continue
+
+        if type_ == "checkbox":
+            # 同意系は必ずチェック、その他はデフォルト維持
+            if category == "agree" or any(kw in (f["label"] or "") for kw in ["同意", "承諾", "プライバシー", "agree", "consent"]):
+                data.setdefault(name, f["value"] or "on")
+            elif f["checked"]:
+                data.setdefault(name, f["value"] or "on")
+            mapping.append({"name": name, "category": category or "checkbox", "filled": name in data})
+            continue
+
+        if type_ == "radio":
+            # グループで未設定の場合のみ先頭/checkedを選ぶ
+            if name in data:
+                continue
+            group = radio_groups.get(name, [])
+            chosen = next((g for g in group if g["checked"]), None) or (group[0] if group else None)
+            if chosen:
+                data[name] = chosen["value"] or "1"
+            mapping.append({"name": name, "category": category or "radio", "filled": name in data})
+            continue
+
+        # 通常のtext/email/tel/url/number
+        val = ""
+        if category and template_map.get(category):
+            val = template_map[category]
+        elif type_ == "email" and template_map["email"]:
+            val = template_map["email"]
+        elif type_ == "tel" and template_map["phone"]:
+            val = template_map["phone"]
+        elif type_ == "url" and template_map["url"]:
+            val = template_map["url"]
+        elif f["required"]:
+            # 必須で分類できないフィールドは message を入れてお茶を濁す
+            val = template_map["message"][:50]
+        data[name] = val
+        mapping.append({"name": name, "category": category or type_, "filled": bool(val)})
+
+    return data, mapping
+
+
+def _check_submission_result(html: str) -> str:
+    """送信後のHTMLから結果を判定: sent / confirm / error"""
+    lower = (html or "").lower()
+    if any(mark.lower() in lower for mark in INQUIRY_SUCCESS_MARKERS):
+        return "sent"
+    if any(mark.lower() in lower for mark in INQUIRY_CONFIRM_MARKERS):
+        return "confirm"
+    # エラー検出
+    if any(kw in lower for kw in ["エラー", "error", "必須", "required", "入力してください", "入力に誤り"]):
+        return "error"
+    return "unknown"
+
+
+def process_single_inquiry(target_url: str, template: dict, dry_run: bool = True, timeout: int = 20) -> dict:
+    """1件の問い合わせフォーム処理。結果dictを返す"""
+    result = {
+        "target_url": target_url,
+        "form_url": None,
+        "status": "failed",
+        "http_status": None,
+        "detected_fields": [],
+        "submission_data": {},
+        "error": None,
+    }
+    try:
+        if not target_url.startswith(("http://", "https://")):
+            target_url = "https://" + target_url
+        if not is_safe_url(target_url):
+            result["error"] = "安全でないURLです"
+            result["status"] = "skipped"
+            return result
+
+        session = requests.Session()
+        session.headers.update(HEADERS)
+
+        form_url, form_html, _ = find_inquiry_form_page(target_url, session)
+        if not form_url:
+            result["error"] = "問い合わせフォームが見つかりませんでした"
+            result["status"] = "no_form"
+            return result
+
+        result["form_url"] = form_url
+        form_info = parse_form(form_html, form_url)
+        if not form_info:
+            result["error"] = "フォームの解析に失敗しました"
+            result["status"] = "no_form"
+            return result
+
+        if form_info["has_captcha"]:
+            result["error"] = "CAPTCHAが設置されているためスキップしました"
+            result["status"] = "captcha"
+            result["detected_fields"] = form_info["fields"]
+            return result
+
+        data, mapping = build_submission_data(form_info, template)
+        result["detected_fields"] = mapping
+        result["submission_data"] = {k: v for k, v in data.items() if not k.lower().startswith(("_token", "csrf"))}
+
+        if dry_run:
+            result["status"] = "preview"
+            return result
+
+        # 送信
+        method = form_info["method"]
+        action = form_info["action"]
+        send = session.post if method == "post" else session.get
+        resp = send(action, data=data, headers=HEADERS, timeout=timeout, allow_redirects=True)
+        result["http_status"] = resp.status_code
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        body = resp.text or ""
+        outcome = _check_submission_result(body)
+
+        # 確認画面 → もう一度submit
+        if outcome == "confirm":
+            soup2 = BeautifulSoup(body, "html.parser")
+            confirm_form = None
+            for form in soup2.find_all("form"):
+                if _looks_like_search_form(form):
+                    continue
+                btn = form.find("input", attrs={"type": "submit"}) or form.find("button")
+                btn_text = (btn.get("value") if btn and btn.name == "input" else (btn.get_text(" ", strip=True) if btn else "")) or ""
+                if any(kw in btn_text for kw in ["送信", "submit", "送る", "確定", "この内容で"]):
+                    confirm_form = form
+                    break
+            if confirm_form is None and soup2.find_all("form"):
+                confirm_form = soup2.find_all("form")[-1]
+            if confirm_form is not None:
+                action2 = urljoin(resp.url, confirm_form.get("action") or resp.url)
+                method2 = (confirm_form.get("method") or "post").lower()
+                data2 = {}
+                for el in confirm_form.find_all(["input", "textarea", "select"]):
+                    nm = el.get("name")
+                    if not nm:
+                        continue
+                    t = (el.get("type") or "").lower()
+                    if t in ("submit", "button", "image", "reset"):
+                        # 送信ボタン名も一応含める
+                        data2[nm] = el.get("value", "")
+                        continue
+                    data2[nm] = el.get("value", "")
+                send2 = session.post if method2 == "post" else session.get
+                resp2 = send2(action2, data=data2, headers=HEADERS, timeout=timeout, allow_redirects=True)
+                result["http_status"] = resp2.status_code
+                resp2.encoding = resp2.apparent_encoding or "utf-8"
+                outcome = _check_submission_result(resp2.text or "")
+
+        if outcome == "sent":
+            result["status"] = "sent"
+        elif outcome == "error":
+            result["status"] = "failed"
+            result["error"] = "送信後にエラー表示を検出しました"
+        else:
+            # 2xx かつ判定不能 → 送信成功の可能性高いが unknown
+            if 200 <= (result["http_status"] or 0) < 400:
+                result["status"] = "sent_unknown"
+            else:
+                result["status"] = "failed"
+                result["error"] = f"HTTP {result['http_status']}"
+    except requests.exceptions.Timeout:
+        result["error"] = "タイムアウト"
+        result["status"] = "failed"
+    except Exception as e:
+        result["error"] = str(e)[:300]
+        result["status"] = "failed"
+    return result
+
+
+def run_inquiry_job(job_id: str, urls: list, template: dict, dry_run: bool, delay_seconds: float, ip: str = ""):
+    """問い合わせフォーム営業ジョブをバックグラウンド実行"""
+    try:
+        INQUIRY_JOBS[job_id]["status"] = "running"
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO inquiry_campaigns (job_id, template_json, total_urls, status, dry_run, ip, created_at) VALUES (?,?,?,?,?,?,?)",
+            (job_id, json.dumps(template, ensure_ascii=False), len(urls), "running", 1 if dry_run else 0, ip, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        conn.commit()
+        campaign_id = conn.execute("SELECT id FROM inquiry_campaigns WHERE job_id=?", (job_id,)).fetchone()[0]
+        conn.close()
+
+        success_count = 0
+        failure_count = 0
+        for idx, url in enumerate(urls):
+            if INQUIRY_JOBS.get(job_id, {}).get("cancel"):
+                break
+            res = process_single_inquiry(url, template, dry_run=dry_run)
+            INQUIRY_JOBS[job_id]["results"].append(res)
+            INQUIRY_JOBS[job_id]["progress"] = idx + 1
+            if res["status"] in ("sent", "sent_unknown", "preview"):
+                success_count += 1
+            else:
+                failure_count += 1
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "INSERT INTO inquiry_submissions (campaign_id, target_url, form_url, status, detected_fields_json, error_message, http_status, submitted_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (
+                        campaign_id, res["target_url"], res.get("form_url"), res["status"],
+                        json.dumps(res.get("detected_fields") or [], ensure_ascii=False),
+                        res.get("error"), res.get("http_status"),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    )
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            if idx < len(urls) - 1 and delay_seconds > 0:
+                time.sleep(delay_seconds)
+
+        INQUIRY_JOBS[job_id]["status"] = "done"
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "UPDATE inquiry_campaigns SET success_count=?, failure_count=?, status=? WHERE id=?",
+                (success_count, failure_count, "done", campaign_id)
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+    except Exception as e:
+        INQUIRY_JOBS[job_id]["status"] = "error"
+        INQUIRY_JOBS[job_id]["error"] = str(e)
+        app.logger.error(f"inquiry job error: {e}")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -2137,6 +2748,127 @@ def chat():
     except Exception as e:
         app.logger.error(f"chat error: {e}")
         return jsonify({"error": "チャット応答の生成に失敗しました"}), 500
+
+
+# ===================================================================
+# 問い合わせフォーム営業 API
+# ===================================================================
+
+def _normalize_inquiry_template(raw: dict) -> dict:
+    """フロントから届いたテンプレートを正規化・サニタイズ"""
+    tpl = {
+        "name": (raw.get("name") or "").strip()[:100],
+        "kana": (raw.get("kana") or "").strip()[:100],
+        "last_name": (raw.get("last_name") or "").strip()[:50],
+        "first_name": (raw.get("first_name") or "").strip()[:50],
+        "company": (raw.get("company") or "").strip()[:200],
+        "department": (raw.get("department") or "").strip()[:100],
+        "position": (raw.get("position") or "").strip()[:100],
+        "email": (raw.get("email") or "").strip()[:200],
+        "phone": (raw.get("phone") or "").strip()[:50],
+        "fax": (raw.get("fax") or "").strip()[:50],
+        "zip": (raw.get("zip") or "").strip()[:20],
+        "address": (raw.get("address") or "").strip()[:300],
+        "url": (raw.get("url") or "").strip()[:300],
+        "subject": (raw.get("subject") or "").strip()[:200],
+        "message": (raw.get("message") or "").strip()[:4000],
+        "inquiry_category": (raw.get("inquiry_category") or "").strip()[:50],
+    }
+    return tpl
+
+
+@app.route("/api/inquiry/detect", methods=["POST"])
+@limiter.limit("10 per minute;60 per hour")
+def inquiry_detect():
+    """単一URLのフォーム検出（ドライラン用プレビュー）"""
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "URLを入力してください"}), 400
+    template = _normalize_inquiry_template(data.get("template") or {})
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    if not is_safe_url(url):
+        return jsonify({"error": "このURLは診断できません"}), 400
+    result = process_single_inquiry(url, template, dry_run=True)
+    return jsonify(result)
+
+
+@app.route("/api/inquiry/send", methods=["POST"])
+@limiter.limit("3 per minute;20 per hour;100 per day")
+def inquiry_send():
+    """問い合わせフォーム営業キャンペーンを開始（バックグラウンド実行）"""
+    data = request.get_json(silent=True) or {}
+    template = _normalize_inquiry_template(data.get("template") or {})
+    urls_raw = data.get("urls") or []
+    if isinstance(urls_raw, str):
+        urls_raw = [u for u in re.split(r"[\r\n,、\s]+", urls_raw) if u.strip()]
+    urls = []
+    for u in urls_raw:
+        u = str(u).strip()
+        if not u:
+            continue
+        if not u.startswith(("http://", "https://")):
+            u = "https://" + u
+        urls.append(u)
+    urls = list(dict.fromkeys(urls))  # 重複除去
+    if not urls:
+        return jsonify({"error": "対象URLを1件以上入力してください"}), 400
+    if len(urls) > 200:
+        return jsonify({"error": "一度に実行できるURLは200件までです"}), 400
+
+    dry_run = bool(data.get("dry_run", True))
+    try:
+        delay = float(data.get("delay_seconds", 3.0))
+    except Exception:
+        delay = 3.0
+    delay = max(0.0, min(delay, 60.0))
+
+    # 本番送信には最低限 name/email/message が必要
+    if not dry_run:
+        missing = [k for k in ("name", "email", "message") if not template.get(k)]
+        if missing:
+            return jsonify({"error": f"本番送信には次の項目が必須です: {', '.join(missing)}"}), 400
+
+    job_id = str(uuid.uuid4())
+    INQUIRY_JOBS[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "total": len(urls),
+        "results": [],
+        "error": None,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    ip = get_remote_address()
+    threading.Thread(
+        target=run_inquiry_job,
+        args=(job_id, urls, template, dry_run, delay, ip),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})
+
+
+@app.route("/api/inquiry/status/<job_id>")
+def inquiry_status(job_id: str):
+    job = INQUIRY_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify({
+        "status": job["status"],
+        "progress": job["progress"],
+        "total": job["total"],
+        "results": job["results"],
+        "error": job.get("error"),
+    })
+
+
+@app.route("/api/inquiry/cancel/<job_id>", methods=["POST"])
+def inquiry_cancel(job_id: str):
+    job = INQUIRY_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    job["cancel"] = True
+    return jsonify({"ok": True})
 
 
 @app.errorhandler(429)
