@@ -2871,6 +2871,269 @@ def inquiry_cancel(job_id: str):
     return jsonify({"ok": True})
 
 
+@app.route("/api/inquiry/generate-message", methods=["POST"])
+@limiter.limit("10 per minute;50 per hour")
+def inquiry_generate_message():
+    """Geminiで営業文面（件名+本文）を自動生成"""
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "Gemini APIキーが未設定です"}), 503
+    data = request.get_json(silent=True) or {}
+    sender_name = (data.get("sender_name") or "").strip()[:100]
+    sender_company = (data.get("sender_company") or "").strip()[:200]
+    service_description = (data.get("service") or "").strip()[:1000]
+    target_industry = (data.get("target_industry") or "").strip()[:200]
+    tone = (data.get("tone") or "丁寧").strip()[:50]
+    if not service_description:
+        return jsonify({"error": "提案するサービス内容を入力してください"}), 400
+
+    prompt = f"""あなたはBtoB営業のプロです。問い合わせフォームから送信する営業メッセージを生成してください。
+
+# 送信者情報
+- 担当者名: {sender_name or "（未指定）"}
+- 会社名: {sender_company or "（未指定）"}
+
+# 提案するサービス
+{service_description}
+
+# 送信先業種
+{target_industry or "（業種指定なし・汎用）"}
+
+# トーン
+{tone}
+
+# 要件
+- 件名: 簡潔に20文字前後、開封したくなる内容
+- 本文: 200〜400字、突然のご連絡へのお詫び→自己紹介→相手のメリット→具体的な提案→次のアクション
+- 過度な売り込み感を避け、相手の課題解決を中心に書く
+- 末尾に署名（担当者名・会社名）を含める
+- 絵文字や記号の装飾は不要
+
+JSONで返してください:
+{{"subject": "...", "message": "..."}}
+"""
+    try:
+        result = call_gemini(prompt)
+        subject = (result.get("subject") or "").strip()
+        message = (result.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "生成に失敗しました"}), 500
+        return jsonify({"subject": subject, "message": message})
+    except Exception as e:
+        app.logger.error(f"inquiry generate error: {e}")
+        return jsonify({"error": "文面生成に失敗しました"}), 500
+
+
+@app.route("/api/inquiry/retry/<int:campaign_id>", methods=["POST"])
+def inquiry_retry(campaign_id: int):
+    """指定キャンペーンの失敗URLのみを再実行"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        camp = conn.execute(
+            "SELECT id, template_json, dry_run FROM inquiry_campaigns WHERE id=?",
+            (campaign_id,)
+        ).fetchone()
+        if not camp:
+            conn.close()
+            return jsonify({"error": "キャンペーンが見つかりません"}), 404
+        failed_rows = conn.execute(
+            "SELECT target_url FROM inquiry_submissions WHERE campaign_id=? AND status IN ('failed','captcha','no_form','skipped')",
+            (campaign_id,)
+        ).fetchall()
+        conn.close()
+        urls = [r[0] for r in failed_rows if r[0]]
+        if not urls:
+            return jsonify({"error": "再実行対象（失敗・CAPTCHA・フォーム無し）のURLがありません"}), 400
+        template = json.loads(camp[1] or "{}")
+        dry_run = bool(camp[2])
+
+        job_id = str(uuid.uuid4())
+        INQUIRY_JOBS[job_id] = {
+            "status": "queued", "progress": 0, "total": len(urls),
+            "results": [], "error": None,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        ip = get_remote_address()
+        threading.Thread(
+            target=run_inquiry_job,
+            args=(job_id, urls, template, dry_run, 5.0, ip),
+            daemon=True,
+        ).start()
+        return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})
+    except Exception as e:
+        app.logger.error(f"inquiry retry error: {e}")
+        return jsonify({"error": "再実行の開始に失敗しました"}), 500
+
+
+@app.route("/api/inquiry/export/<job_id>")
+def inquiry_export(job_id: str):
+    """キャンペーン結果をCSVでダウンロード（job_id または campaign_id を受付）"""
+    import csv
+    from io import StringIO
+    from flask import Response
+
+    rows = []
+    job = INQUIRY_JOBS.get(job_id)
+    if job and job.get("results"):
+        for r in job["results"]:
+            rows.append([
+                r.get("target_url", ""), r.get("form_url", "") or "",
+                r.get("status", ""), r.get("http_status") or "",
+                r.get("error") or "", "",
+            ])
+    else:
+        try:
+            cid = int(job_id)
+        except ValueError:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                row = conn.execute("SELECT id FROM inquiry_campaigns WHERE job_id=?", (job_id,)).fetchone()
+                conn.close()
+                if not row:
+                    return jsonify({"error": "見つかりません"}), 404
+                cid = row[0]
+            except Exception:
+                return jsonify({"error": "見つかりません"}), 404
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            for r in conn.execute(
+                "SELECT target_url, form_url, status, http_status, error_message, submitted_at "
+                "FROM inquiry_submissions WHERE campaign_id=? ORDER BY id ASC",
+                (cid,),
+            ).fetchall():
+                rows.append(list(r))
+            conn.close()
+        except Exception:
+            return jsonify({"error": "DB読込失敗"}), 500
+
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["target_url", "form_url", "status", "http_status", "error", "submitted_at"])
+    for r in rows:
+        w.writerow(r)
+    csv_bytes = ("﻿" + buf.getvalue()).encode("utf-8")  # ExcelでもUTF-8で読めるようBOM付き
+    return Response(
+        csv_bytes, mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="inquiry_{job_id}.csv"'},
+    )
+
+
+@app.route("/inquiry/dashboard")
+def inquiry_dashboard():
+    token = request.args.get("token", "")
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        abort(403)
+    conn = sqlite3.connect(DB_PATH)
+    campaigns = conn.execute(
+        "SELECT id, job_id, total_urls, success_count, failure_count, status, dry_run, created_at "
+        "FROM inquiry_campaigns ORDER BY id DESC LIMIT 100"
+    ).fetchall()
+    selected_id = request.args.get("campaign", "")
+    submissions = []
+    if selected_id:
+        try:
+            cid = int(selected_id)
+            submissions = conn.execute(
+                "SELECT id, target_url, form_url, status, http_status, error_message, submitted_at "
+                "FROM inquiry_submissions WHERE campaign_id=? ORDER BY id DESC LIMIT 500",
+                (cid,),
+            ).fetchall()
+        except Exception:
+            submissions = []
+    conn.close()
+
+    total_camps = len(campaigns)
+    sent_total = sum(c[3] or 0 for c in campaigns)
+    fail_total = sum(c[4] or 0 for c in campaigns)
+
+    rows_html = ""
+    for c in campaigns:
+        cid, jid, total, success, failure, status, dry, created = c
+        badge_dry = '<span style="background:#E8F0FE;color:#1A73E8;padding:2px 6px;border-radius:8px;font-size:11px;">DRY</span>' if dry else '<span style="background:#FCE8E6;color:#C5221F;padding:2px 6px;border-radius:8px;font-size:11px;">LIVE</span>'
+        status_color = {"running": "#FBBC04", "done": "#34A853", "error": "#EA4335"}.get(status, "#5F6368")
+        rows_html += (
+            f'<tr>'
+            f'<td>{cid}</td>'
+            f'<td>{badge_dry}</td>'
+            f'<td style="color:{status_color};font-weight:700;">{status}</td>'
+            f'<td>{total or 0}</td>'
+            f'<td style="color:#34A853;">{success or 0}</td>'
+            f'<td style="color:#EA4335;">{failure or 0}</td>'
+            f'<td>{created}</td>'
+            f'<td>'
+            f'<a href="/inquiry/dashboard?token={token}&campaign={cid}" style="color:#1A73E8;margin-right:8px;">詳細</a>'
+            f'<a href="/api/inquiry/export/{cid}" style="color:#1A73E8;margin-right:8px;">CSV</a>'
+            f'<button onclick="retryCampaign({cid})" style="background:#fff;border:1px solid #E8EAED;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:12px;">失敗再実行</button>'
+            f'</td>'
+            f'</tr>'
+        )
+
+    sub_html = ""
+    if submissions:
+        sub_html = '<h2>キャンペーン #' + str(selected_id) + ' の送信明細</h2><table><tr><th>#</th><th>対象URL</th><th>フォームURL</th><th>ステータス</th><th>HTTP</th><th>エラー</th><th>日時</th></tr>'
+        for s in submissions:
+            sid, turl, furl, st, hs, err, sa = s
+            color = {"sent": "#34A853", "sent_unknown": "#1A73E8", "preview": "#1A73E8",
+                     "no_form": "#FBBC04", "captcha": "#C5221F", "failed": "#EA4335"}.get(st, "#5F6368")
+            sub_html += (
+                f'<tr>'
+                f'<td>{sid}</td>'
+                f'<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="{turl}" target="_blank" rel="noopener">{turl}</a></td>'
+                f'<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{furl or "-"}</td>'
+                f'<td style="color:{color};font-weight:700;">{st}</td>'
+                f'<td>{hs or "-"}</td>'
+                f'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#C5221F;">{err or ""}</td>'
+                f'<td>{sa}</td>'
+                f'</tr>'
+            )
+        sub_html += '</table>'
+
+    return f"""<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<title>フォーム営業ダッシュボード</title>
+<style>
+body{{font-family:'Noto Sans JP',sans-serif;background:#F8F9FA;color:#202124;padding:2rem;max-width:1200px;margin:0 auto;}}
+h1{{font-size:1.5rem;font-weight:700;margin-bottom:1rem;color:#1A73E8;}}
+h2{{font-size:1.1rem;font-weight:700;margin:2rem 0 1rem;color:#202124;}}
+.stats{{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;}}
+.stat{{background:#fff;border:1px solid #E8EAED;border-radius:8px;padding:1rem 1.5rem;}}
+.stat-num{{font-size:1.8rem;font-weight:800;color:#1A73E8;}}
+.stat-label{{font-size:.85rem;color:#5F6368;}}
+table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:2rem;font-size:.9rem;}}
+th{{background:#F1F3F4;padding:.65rem .8rem;text-align:left;font-size:.82rem;color:#3C4043;}}
+td{{padding:.55rem .8rem;border-top:1px solid #F1F3F4;}}
+a{{color:#1A73E8;text-decoration:none;}}
+.back{{display:inline-block;margin-bottom:1rem;color:#5F6368;}}
+</style></head><body>
+<a href="/" class="back">← トップへ</a>
+<h1>📬 フォーム営業 ダッシュボード</h1>
+<div class="stats">
+  <div class="stat"><div class="stat-num">{total_camps}</div><div class="stat-label">キャンペーン数</div></div>
+  <div class="stat"><div class="stat-num" style="color:#34A853;">{sent_total}</div><div class="stat-label">累計成功</div></div>
+  <div class="stat"><div class="stat-num" style="color:#EA4335;">{fail_total}</div><div class="stat-label">累計失敗</div></div>
+</div>
+
+<h2>キャンペーン一覧</h2>
+<table>
+<tr><th>#</th><th>モード</th><th>状態</th><th>対象</th><th>成功</th><th>失敗</th><th>日時</th><th>操作</th></tr>
+{rows_html or '<tr><td colspan="8" style="text-align:center;color:#5F6368;">キャンペーンがまだありません</td></tr>'}
+</table>
+
+{sub_html}
+
+<script>
+async function retryCampaign(cid) {{
+  if (!confirm('失敗・CAPTCHA・フォーム無しのURLを再実行します。よろしいですか？')) return;
+  try {{
+    const r = await fetch('/api/inquiry/retry/' + cid, {{method:'POST'}});
+    const j = await r.json();
+    if (!r.ok) {{ alert('エラー: ' + j.error); return; }}
+    alert('再実行を開始しました（job_id: ' + j.job_id + ', 対象: ' + j.total + '件）');
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+</script>
+</body></html>"""
+
+
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify({"error": "アクセスが集中しています。1〜2分後にもう一度お試しください。"}), 429
