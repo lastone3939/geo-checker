@@ -1321,6 +1321,22 @@
               <button type="button" onclick="previewEmail()" style="margin-top:8px;padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">👁 1件目でプレビュー</button>
             </div>
 
+            <!-- 外部ツールの送信済みを除外リストに取込 -->
+            <div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:#B06000;margin-bottom:8px;">📋 外部ツールの送信済み一覧を取込（任意）</p>
+              <p style="font-size:12px;color:#5F6368;line-height:1.5;margin-bottom:10px;">
+                Mail Sales GiveFast 等の表（メアド + ステータス）を <strong>全選択コピー</strong>して貼り付けると、<br>
+                <code>sent</code> / <code>unsubscribed</code> を自動検出し、次回送信から除外します。<code>pending</code> はそのまま送信対象として残ります。
+              </p>
+              <textarea id="emExcludeText" rows="4" class="inq-input" placeholder="osada@sincere-audit.com   メモ=,名前=長田 洋和   unsubscribed&#10;shinnosuke.go@e-tenki.co.jp   名前=郷 真之介   sent&#10;m.ikeda@blocks-office.jp   名前=池田 美月   pending&#10;...（表を丸ごと貼り付けOK）"></textarea>
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                <button type="button" onclick="importEmailExcludeList()" style="padding:8px 14px;background:#FB8C00;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">取込（除外リストに追加）</button>
+                <button type="button" onclick="refreshExcludeCount()" style="padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-sub);">現在の除外件数を確認</button>
+                <button type="button" onclick="clearExternalSentLog()" style="padding:8px 14px;background:#fff;border:1px solid #EA4335;color:#EA4335;border-radius:8px;cursor:pointer;font-size:12px;">外部取込分のみクリア</button>
+              </div>
+              <div id="emExcludeStatus" style="font-size:12px;color:#5F6368;margin-top:8px;"></div>
+            </div>
+
             <!-- 送信先 -->
             <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
@@ -1330,7 +1346,7 @@
                   <input type="file" id="emCsvFile" accept=".csv,.txt" style="display:none;" onchange="loadEmailCsv(event)">
                 </label>
               </div>
-              <textarea id="emRecipients" rows="8" class="inq-input" placeholder="email,name,company&#10;info@example.com,山田太郎,株式会社A&#10;contact@another.co.jp,鈴木花子,株式会社B&#10;&#10;または1行1メアド:&#10;info@example.com&#10;contact@another.co.jp"></textarea>
+              <textarea id="emRecipients" rows="8" class="inq-input" placeholder="email,name,company&#10;info@example.com,山田太郎,株式会社A&#10;contact@another.co.jp,鈴木花子,株式会社B&#10;&#10;または1行1メアド:&#10;info@example.com&#10;contact@another.co.jp&#10;&#10;※全792件まるごと貼り付ければOK。上で取込んだ送信済みは自動スキップ"></textarea>
               <div id="emRecipientCount" style="font-size:11px;color:var(--muted);margin-top:6px;">0 件</div>
             </div>
 
@@ -3337,6 +3353,56 @@ async function cancelEmailCampaign() {
   if (!emailJobId) return;
   if (!confirm('このメールキャンペーンを中止しますか？')) return;
   try { await fetch('/api/email/cancel/' + emailJobId, {method:'POST'}); } catch (e) {}
+}
+
+async function importEmailExcludeList() {
+  const text = (document.getElementById('emExcludeText').value || '').trim();
+  const status = document.getElementById('emExcludeStatus');
+  if (!text) { alert('外部ツールの送信済み一覧を貼り付けてください'); return; }
+  status.style.color = '#5F6368';
+  status.textContent = '取込中...';
+  try {
+    const r = await fetch('/api/email/exclude/import', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#34A853';
+    status.textContent = `✅ 除外リストに ${j.added} 件追加 / pendingは ${j.kept_as_pending} 件保留（検出メアド合計 ${j.total_emails_detected} 件）`;
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
+}
+
+async function refreshExcludeCount() {
+  const status = document.getElementById('emExcludeStatus');
+  try {
+    const r = await fetch('/api/email/exclude/count');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#1A73E8';
+    status.textContent = `現在の除外件数: 合計 ${j.total_unique_sent} 件（うち外部取込 ${j.external_imported} 件）`;
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
+}
+
+async function clearExternalSentLog() {
+  if (!confirm('外部ツールから取込んだ送信履歴のみをクリアします。\n（このツールから送信したキャンペーンの履歴は残ります）\nよろしいですか？')) return;
+  const status = document.getElementById('emExcludeStatus');
+  try {
+    const r = await fetch('/api/email/exclude/clear', {method:'POST'});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#5F6368';
+    status.textContent = `🗑 ${j.deleted} 件の外部取込分をクリアしました`;
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
 }
 
 // バウンスメール登録

@@ -3616,11 +3616,11 @@ def _load_blacklist_emails_and_domains() -> tuple:
 
 
 def _load_already_sent_emails() -> set:
-    """過去にsent成功したメールアドレス"""
+    """過去にsent成功したメールアドレス（外部ツールから取込んだ送信履歴も含む）"""
     try:
         conn = sqlite3.connect(DB_PATH)
         rows = conn.execute(
-            "SELECT to_email FROM email_sent_log WHERE status='sent'"
+            "SELECT to_email FROM email_sent_log WHERE status IN ('sent','sent_external')"
         ).fetchall()
         conn.close()
         return {r[0].strip().lower() for r in rows if r[0]}
@@ -3847,6 +3847,90 @@ def email_cancel(job_id: str):
         return jsonify({"error": "ジョブが見つかりません"}), 404
     job["cancel"] = True
     return jsonify({"ok": True})
+
+
+@app.route("/api/email/exclude/import", methods=["POST"])
+def email_exclude_import():
+    """外部ツール（Mail Sales GiveFast 等）の送信済み一覧を取込み、除外リストに登録。
+    入力: { text: "..." } - 各行に email と status('sent'/'unsubscribed'/'opened'/'失敗'等) を含むテキスト。
+    'sent'/'unsubscribed'/'opened' を含む行のメアドを email_sent_log に status='sent_external' で記録し、
+    次回送信時に自動スキップされるようにする。
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "テキストを貼り付けてください"}), 400
+
+    EXCLUDE_KEYWORDS = ["sent", "delivered", "送信済", "配信済", "opened", "open",
+                        "unsubscribed", "unsub", "配信停止", "拒否", "解除", "オプトアウト"]
+    PENDING_KEYWORDS = ["pending", "queued", "未送信", "待機", "draft"]
+
+    added = 0
+    skipped_pending = 0
+    detected_emails = 0
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for line in text.splitlines():
+            line_lower = line.lower()
+            emails_in_line = EMAIL_RE.findall(line)
+            if not emails_in_line:
+                continue
+            detected_emails += len(emails_in_line)
+            # 明示的に pending と分類されている行はスキップ（送信対象として残す）
+            is_pending = any(kw in line_lower for kw in PENDING_KEYWORDS) and not any(kw in line_lower for kw in EXCLUDE_KEYWORDS)
+            if is_pending:
+                skipped_pending += len(emails_in_line)
+                continue
+            # 除外キーワードを含む行 → 各メアドを sent_external として記録
+            if any(kw in line_lower for kw in EXCLUDE_KEYWORDS):
+                for email in emails_in_line:
+                    email = email.strip().lower()
+                    cur = conn.execute(
+                        "INSERT INTO email_sent_log (campaign_id, to_email, status, error_message, sent_at) "
+                        "VALUES (?,?,?,?,?)",
+                        (None, email, "sent_external", "imported from external tool", now),
+                    )
+                    if cur.rowcount > 0:
+                        added += 1
+        conn.commit()
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "added": added,
+            "kept_as_pending": skipped_pending,
+            "total_emails_detected": detected_emails,
+        })
+    except Exception as e:
+        app.logger.error(f"exclude import error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/email/exclude/count")
+def email_exclude_count():
+    """現在の送信済み履歴件数を返す"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        total = conn.execute("SELECT COUNT(DISTINCT to_email) FROM email_sent_log WHERE status IN ('sent','sent_external')").fetchone()[0]
+        external = conn.execute("SELECT COUNT(DISTINCT to_email) FROM email_sent_log WHERE status='sent_external'").fetchone()[0]
+        conn.close()
+        return jsonify({"total_unique_sent": total, "external_imported": external})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/email/exclude/clear", methods=["POST"])
+def email_exclude_clear():
+    """外部取込分のみクリア（自分のキャンペーンの送信履歴は残す）"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.execute("DELETE FROM email_sent_log WHERE status='sent_external'")
+        deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "deleted": deleted})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/email/preview", methods=["POST"])
