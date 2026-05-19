@@ -163,6 +163,8 @@
     .inq-status-captcha { background: #FCE8E6; color: #C5221F; }
     .inq-status-failed { background: #FCE8E6; color: #C5221F; }
     .inq-status-skipped { background: #F1F3F4; color: #5F6368; }
+    .inq-status-skipped_blacklist { background: #F1F3F4; color: #5F6368; }
+    .inq-status-skipped_duplicate { background: #F1F3F4; color: #5F6368; }
     .inq-status-sent_unknown { background: #E8F0FE; color: #1A73E8; }
 
     /* 入力フォーム */
@@ -1181,8 +1183,9 @@
                 <textarea id="inqMessage" rows="6" class="inq-input" placeholder="突然のご連絡失礼いたします。株式会社ZETTAIの清水と申します。..."></textarea>
               </label>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                <button type="button" onclick="saveInquiryTemplate()" style="flex:1;min-width:120px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">💾 テンプレート保存</button>
-                <button type="button" onclick="loadInquiryTemplate()" style="flex:1;min-width:120px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📥 読込</button>
+                <button type="button" onclick="saveInquiryTemplate()" style="flex:1;min-width:110px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">💾 ローカル保存</button>
+                <button type="button" onclick="loadInquiryTemplate()" style="flex:1;min-width:110px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📥 ローカル読込</button>
+                <button type="button" onclick="openSavedTemplatesModal()" style="flex:1;min-width:110px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📋 保存済み一覧</button>
                 <button type="button" onclick="openAiMessageModal()" style="flex:1;min-width:120px;padding:10px;background:linear-gradient(135deg,#9D50BB,#6F42C1);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">✨ AIで文面生成</button>
               </div>
             </div>
@@ -1203,9 +1206,17 @@
             <!-- ステップ3: 実行オプション -->
             <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
               <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">③ 実行オプション</p>
-              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:8px;cursor:pointer;">
                 <input type="checkbox" id="inqDryRun" checked>
                 <span>プレビューのみ（ドライラン：実際には送信しない）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" id="inqSkipDup" checked>
+                <span>過去に送信成功したドメインは自動スキップ（重複送信防止）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+                <input type="checkbox" id="inqSkipBl" checked>
+                <span>NGドメイン（ブラックリスト）を自動スキップ</span>
               </label>
               <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);">
                 送信間隔
@@ -1257,6 +1268,22 @@
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- 保存済みテンプレート一覧モーダル -->
+    <div id="savedTplModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:#fff;border-radius:12px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <p style="font-size:15px;font-weight:700;color:var(--primary);margin:0;">📋 保存済みテンプレート</p>
+          <button type="button" onclick="closeSavedTemplatesModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-sub);">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <input id="newTplName" placeholder="テンプレート名（例: 飲食店向け）" class="inq-input">
+          <input id="newTplTag" placeholder="タグ（例: 飲食）" class="inq-input">
+        </div>
+        <button type="button" onclick="saveTemplateToServer()" class="submit-btn" style="width:100%;margin-bottom:14px;">現在の入力内容を保存</button>
+        <div id="savedTplList" style="font-size:13px;"></div>
       </div>
     </div>
 
@@ -2794,7 +2821,8 @@ function renderInquiryResults(results) {
   wrap.style.display = 'block';
   const labelMap = {
     sent: '✅ 送信完了', sent_unknown: '🔵 送信OK?', preview: '👁 プレビュー',
-    no_form: '⚠️ フォーム無し', captcha: '🛡 CAPTCHA', skipped: '⏭ スキップ',
+    no_form: '⚠️ フォーム無し', captcha: '🛡 CAPTCHA',
+    skipped: '⏭ スキップ', skipped_blacklist: '🚫 NGドメイン', skipped_duplicate: '🔁 送信済み',
     failed: '❌ 失敗',
   };
   body.innerHTML = results.map((r, idx) => {
@@ -2871,10 +2899,16 @@ async function startInquiryCampaign() {
   document.getElementById('inqResultWrap').style.display = 'none';
 
   try {
+    const skipDup = document.getElementById('inqSkipDup') ? document.getElementById('inqSkipDup').checked : true;
+    const skipBl = document.getElementById('inqSkipBl') ? document.getElementById('inqSkipBl').checked : true;
     const resp = await fetch('/api/inquiry/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template, urls, dry_run: dryRun, delay_seconds: delay }),
+      body: JSON.stringify({
+        template, urls,
+        dry_run: dryRun, delay_seconds: delay,
+        skip_duplicates: skipDup, skip_blacklist: skipBl,
+      }),
     });
     const data = await resp.json();
     if (!resp.ok) { throw new Error(data.error || '開始に失敗しました'); }
@@ -2965,6 +2999,73 @@ function loadInquiryUrlsCsv(event) {
     event.target.value = '';
   };
   reader.readAsText(file, 'UTF-8');
+}
+
+// 保存済みテンプレート（サーバー側）
+async function openSavedTemplatesModal() {
+  document.getElementById('savedTplModal').style.display = 'flex';
+  await refreshSavedTemplates();
+}
+function closeSavedTemplatesModal() {
+  document.getElementById('savedTplModal').style.display = 'none';
+}
+async function refreshSavedTemplates() {
+  const wrap = document.getElementById('savedTplList');
+  wrap.innerHTML = '<div style="color:var(--text-sub);text-align:center;padding:10px;">読込中...</div>';
+  try {
+    const r = await fetch('/api/inquiry/templates');
+    const j = await r.json();
+    const items = j.items || [];
+    if (!items.length) { wrap.innerHTML = '<div style="color:var(--text-sub);text-align:center;padding:10px;">保存済みテンプレートはありません</div>'; return; }
+    wrap.innerHTML = items.map(it => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;">${escapeHtml(it.name)}${it.tag ? ' <span style="background:#E8F0FE;color:#1A73E8;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px;">' + escapeHtml(it.tag) + '</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--text-sub);">${escapeHtml(it.updated_at)} - 件名: ${escapeHtml((it.template.subject || '').slice(0, 30))}</div>
+        </div>
+        <button onclick="applySavedTemplate(${it.id})" style="padding:6px 10px;background:#1A73E8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">適用</button>
+        <button onclick="deleteSavedTemplate(${it.id})" style="padding:6px 10px;background:#fff;color:#EA4335;border:1px solid #EA4335;border-radius:6px;cursor:pointer;font-size:12px;">削除</button>
+      </div>
+    `).join('');
+    window._savedTpls = items;
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:#EA4335;">読込エラー: ' + e.message + '</div>';
+  }
+}
+async function saveTemplateToServer() {
+  const name = (document.getElementById('newTplName').value || '').trim();
+  const tag = (document.getElementById('newTplTag').value || '').trim();
+  if (!name) { alert('テンプレート名を入力してください'); return; }
+  try {
+    const r = await fetch('/api/inquiry/templates', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, tag, template: collectInquiryTemplate()}),
+    });
+    const j = await r.json();
+    if (!r.ok) { alert('エラー: ' + j.error); return; }
+    document.getElementById('newTplName').value = '';
+    document.getElementById('newTplTag').value = '';
+    await refreshSavedTemplates();
+  } catch (e) { alert('エラー: ' + e.message); }
+}
+function applySavedTemplate(tid) {
+  const tpl = (window._savedTpls || []).find(t => t.id === tid);
+  if (!tpl) return;
+  const t = tpl.template || {};
+  const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  setV('inqName', t.name); setV('inqKana', t.kana); setV('inqCompany', t.company);
+  setV('inqDepartment', t.department); setV('inqEmail', t.email); setV('inqPhone', t.phone);
+  setV('inqUrl', t.url); setV('inqAddress', t.address); setV('inqSubject', t.subject);
+  setV('inqMessage', t.message);
+  closeSavedTemplatesModal();
+}
+async function deleteSavedTemplate(tid) {
+  if (!confirm('このテンプレートを削除しますか？')) return;
+  try {
+    const r = await fetch('/api/inquiry/templates/' + tid, {method:'DELETE'});
+    if (!r.ok) { alert('削除に失敗'); return; }
+    await refreshSavedTemplates();
+  } catch (e) { alert('エラー: ' + e.message); }
 }
 
 // AI文面生成

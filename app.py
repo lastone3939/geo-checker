@@ -114,6 +114,26 @@ def init_db():
             submitted_at TEXT NOT NULL
         )
     """)
+    # NGドメインリスト（送信禁止）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_blacklist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain TEXT UNIQUE NOT NULL,
+            reason TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # 保存済みテンプレート
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            template_json TEXT NOT NULL,
+            tag TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -1915,7 +1935,39 @@ def process_single_inquiry(target_url: str, template: dict, dry_run: bool = True
     return result
 
 
-def run_inquiry_job(job_id: str, urls: list, template: dict, dry_run: bool, delay_seconds: float, ip: str = ""):
+def _domain_of(url: str) -> str:
+    try:
+        host = (urlparse(url).hostname or "").lower()
+        return host[4:] if host.startswith("www.") else host
+    except Exception:
+        return ""
+
+
+def _load_blacklist_domains() -> set:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute("SELECT domain FROM inquiry_blacklist").fetchall()
+        conn.close()
+        return {r[0].strip().lower() for r in rows if r[0]}
+    except Exception:
+        return set()
+
+
+def _load_already_sent_domains() -> set:
+    """過去に sent / sent_unknown / preview ステータスで送信成功したドメイン"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT target_url FROM inquiry_submissions WHERE status IN ('sent','sent_unknown')"
+        ).fetchall()
+        conn.close()
+        return {_domain_of(r[0]) for r in rows if r[0] and _domain_of(r[0])}
+    except Exception:
+        return set()
+
+
+def run_inquiry_job(job_id: str, urls: list, template: dict, dry_run: bool, delay_seconds: float, ip: str = "",
+                    skip_duplicates: bool = True, skip_blacklist: bool = True):
     """問い合わせフォーム営業ジョブをバックグラウンド実行"""
     try:
         INQUIRY_JOBS[job_id]["status"] = "running"
@@ -1928,12 +1980,27 @@ def run_inquiry_job(job_id: str, urls: list, template: dict, dry_run: bool, dela
         campaign_id = conn.execute("SELECT id FROM inquiry_campaigns WHERE job_id=?", (job_id,)).fetchone()[0]
         conn.close()
 
+        blacklist = _load_blacklist_domains() if skip_blacklist else set()
+        already_sent = _load_already_sent_domains() if (skip_duplicates and not dry_run) else set()
+
         success_count = 0
         failure_count = 0
         for idx, url in enumerate(urls):
             if INQUIRY_JOBS.get(job_id, {}).get("cancel"):
                 break
-            res = process_single_inquiry(url, template, dry_run=dry_run)
+            dom = _domain_of(url)
+            if dom and dom in blacklist:
+                res = {"target_url": url, "form_url": None, "status": "skipped_blacklist",
+                       "http_status": None, "detected_fields": [], "submission_data": {},
+                       "error": f"NGドメイン: {dom}"}
+            elif dom and dom in already_sent:
+                res = {"target_url": url, "form_url": None, "status": "skipped_duplicate",
+                       "http_status": None, "detected_fields": [], "submission_data": {},
+                       "error": f"過去に送信済み: {dom}"}
+            else:
+                res = process_single_inquiry(url, template, dry_run=dry_run)
+                if res["status"] in ("sent", "sent_unknown") and dom:
+                    already_sent.add(dom)
             INQUIRY_JOBS[job_id]["results"].append(res)
             INQUIRY_JOBS[job_id]["progress"] = idx + 1
             if res["status"] in ("sent", "sent_unknown", "preview"):
@@ -1955,7 +2022,9 @@ def run_inquiry_job(job_id: str, urls: list, template: dict, dry_run: bool, dela
                 conn.close()
             except Exception:
                 pass
-            if idx < len(urls) - 1 and delay_seconds > 0:
+            # スキップ（ブラックリスト・重複）の場合は通信していないので待機しない
+            was_skipped = res["status"].startswith("skipped")
+            if idx < len(urls) - 1 and delay_seconds > 0 and not was_skipped:
                 time.sleep(delay_seconds)
 
         INQUIRY_JOBS[job_id]["status"] = "done"
@@ -2818,6 +2887,8 @@ def inquiry_send():
         return jsonify({"error": "一度に実行できるURLは200件までです"}), 400
 
     dry_run = bool(data.get("dry_run", True))
+    skip_duplicates = bool(data.get("skip_duplicates", True))
+    skip_blacklist = bool(data.get("skip_blacklist", True))
     try:
         delay = float(data.get("delay_seconds", 3.0))
     except Exception:
@@ -2842,7 +2913,7 @@ def inquiry_send():
     ip = get_remote_address()
     threading.Thread(
         target=run_inquiry_job,
-        args=(job_id, urls, template, dry_run, delay, ip),
+        args=(job_id, urls, template, dry_run, delay, ip, skip_duplicates, skip_blacklist),
         daemon=True,
     ).start()
     return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})
@@ -2955,7 +3026,7 @@ def inquiry_retry(campaign_id: int):
         ip = get_remote_address()
         threading.Thread(
             target=run_inquiry_job,
-            args=(job_id, urls, template, dry_run, 5.0, ip),
+            args=(job_id, urls, template, dry_run, 5.0, ip, True, True),
             daemon=True,
         ).start()
         return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})
@@ -3039,7 +3110,27 @@ def inquiry_dashboard():
             ).fetchall()
         except Exception:
             submissions = []
+    blacklist_rows = conn.execute(
+        "SELECT id, domain, reason, created_at FROM inquiry_blacklist ORDER BY id DESC LIMIT 200"
+    ).fetchall()
+    # ドメイン別統計（直近1000件から集計）
+    submission_rows = conn.execute(
+        "SELECT target_url, status FROM inquiry_submissions ORDER BY id DESC LIMIT 1000"
+    ).fetchall()
     conn.close()
+
+    domain_stats = {}
+    for url, st in submission_rows:
+        dom = _domain_of(url)
+        if not dom:
+            continue
+        s = domain_stats.setdefault(dom, {"total": 0, "sent": 0, "failed": 0})
+        s["total"] += 1
+        if st in ("sent", "sent_unknown"):
+            s["sent"] += 1
+        elif st in ("failed", "captcha", "no_form"):
+            s["failed"] += 1
+    top_domains = sorted(domain_stats.items(), key=lambda kv: -kv[1]["total"])[:15]
 
     total_camps = len(campaigns)
     sent_total = sum(c[3] or 0 for c in campaigns)
@@ -3087,6 +3178,38 @@ def inquiry_dashboard():
             )
         sub_html += '</table>'
 
+    # ドメイン別統計テーブル
+    domain_html = ""
+    if top_domains:
+        domain_html = '<table><tr><th>ドメイン</th><th>合計</th><th>成功</th><th>失敗</th><th>成功率</th><th>操作</th></tr>'
+        for dom, s in top_domains:
+            rate = round(s["sent"] / s["total"] * 100, 1) if s["total"] else 0
+            color = "#34A853" if rate >= 50 else ("#FBBC04" if rate >= 20 else "#EA4335")
+            domain_html += (
+                f'<tr><td>{dom}</td><td>{s["total"]}</td>'
+                f'<td style="color:#34A853;">{s["sent"]}</td>'
+                f'<td style="color:#EA4335;">{s["failed"]}</td>'
+                f'<td style="color:{color};font-weight:700;">{rate}%</td>'
+                f'<td><button onclick="addBlacklist(\'{dom}\')" style="background:#fff;border:1px solid #E8EAED;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px;">NGに追加</button></td>'
+                f'</tr>'
+            )
+        domain_html += '</table>'
+    else:
+        domain_html = '<p style="color:#5F6368;font-size:.9rem;">送信履歴がまだありません</p>'
+
+    # NGドメインテーブル
+    bl_html = '<table><tr><th>#</th><th>ドメイン</th><th>理由</th><th>登録日時</th><th>操作</th></tr>'
+    if blacklist_rows:
+        for r in blacklist_rows:
+            bid, dom, reason, ca = r
+            bl_html += (
+                f'<tr><td>{bid}</td><td>{dom}</td><td>{reason or "-"}</td><td>{ca}</td>'
+                f'<td><button onclick="deleteBlacklist({bid})" style="background:#fff;border:1px solid #EA4335;color:#EA4335;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px;">削除</button></td></tr>'
+            )
+    else:
+        bl_html += '<tr><td colspan="5" style="text-align:center;color:#5F6368;">NGドメイン未登録</td></tr>'
+    bl_html += '</table>'
+
     return f"""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
 <title>フォーム営業ダッシュボード</title>
@@ -3103,6 +3226,9 @@ th{{background:#F1F3F4;padding:.65rem .8rem;text-align:left;font-size:.82rem;col
 td{{padding:.55rem .8rem;border-top:1px solid #F1F3F4;}}
 a{{color:#1A73E8;text-decoration:none;}}
 .back{{display:inline-block;margin-bottom:1rem;color:#5F6368;}}
+.add-form{{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}}
+.add-form input{{padding:.5rem .75rem;border:1px solid #E8EAED;border-radius:6px;font-size:.9rem;}}
+.add-form button{{padding:.5rem 1rem;background:#1A73E8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:.85rem;}}
 </style></head><body>
 <a href="/" class="back">← トップへ</a>
 <h1>📬 フォーム営業 ダッシュボード</h1>
@@ -3110,6 +3236,7 @@ a{{color:#1A73E8;text-decoration:none;}}
   <div class="stat"><div class="stat-num">{total_camps}</div><div class="stat-label">キャンペーン数</div></div>
   <div class="stat"><div class="stat-num" style="color:#34A853;">{sent_total}</div><div class="stat-label">累計成功</div></div>
   <div class="stat"><div class="stat-num" style="color:#EA4335;">{fail_total}</div><div class="stat-label">累計失敗</div></div>
+  <div class="stat"><div class="stat-num" style="color:#5F6368;">{len(blacklist_rows)}</div><div class="stat-label">NGドメイン</div></div>
 </div>
 
 <h2>キャンペーン一覧</h2>
@@ -3119,6 +3246,17 @@ a{{color:#1A73E8;text-decoration:none;}}
 </table>
 
 {sub_html}
+
+<h2>ドメイン別 成功率（直近1000件）</h2>
+{domain_html}
+
+<h2>NGドメイン管理</h2>
+<div class="add-form">
+  <input id="newDomain" placeholder="example.com" style="flex:1;min-width:200px;">
+  <input id="newReason" placeholder="理由（任意）" style="flex:1;min-width:200px;">
+  <button onclick="addBlacklistManual()">追加</button>
+</div>
+{bl_html}
 
 <script>
 async function retryCampaign(cid) {{
@@ -3130,8 +3268,146 @@ async function retryCampaign(cid) {{
     alert('再実行を開始しました（job_id: ' + j.job_id + ', 対象: ' + j.total + '件）');
   }} catch(e) {{ alert('エラー: ' + e.message); }}
 }}
+async function addBlacklist(domain) {{
+  const reason = prompt('「' + domain + '」をNGドメインに追加します。理由（任意）:', '');
+  if (reason === null) return;
+  await postBlacklist(domain, reason);
+}}
+async function addBlacklistManual() {{
+  const d = document.getElementById('newDomain').value.trim();
+  const r = document.getElementById('newReason').value.trim();
+  if (!d) {{ alert('ドメインを入力してください'); return; }}
+  await postBlacklist(d, r);
+}}
+async function postBlacklist(domain, reason) {{
+  try {{
+    const r = await fetch('/api/inquiry/blacklist', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{domain: domain, reason: reason}}),
+    }});
+    const j = await r.json();
+    if (!r.ok) {{ alert('エラー: ' + j.error); return; }}
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function deleteBlacklist(bid) {{
+  if (!confirm('NGドメインを削除しますか？')) return;
+  try {{
+    const r = await fetch('/api/inquiry/blacklist/' + bid, {{method:'DELETE'}});
+    if (!r.ok) {{ alert('削除に失敗しました'); return; }}
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
 </script>
 </body></html>"""
+
+
+# ===== ブラックリスト管理 API =====
+@app.route("/api/inquiry/blacklist", methods=["GET"])
+def inquiry_blacklist_list():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, domain, reason, created_at FROM inquiry_blacklist ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+    return jsonify({"items": [{"id": r[0], "domain": r[1], "reason": r[2], "created_at": r[3]} for r in rows]})
+
+
+@app.route("/api/inquiry/blacklist", methods=["POST"])
+def inquiry_blacklist_add():
+    data = request.get_json(silent=True) or {}
+    domain = (data.get("domain") or "").strip().lower()
+    reason = (data.get("reason") or "").strip()[:200]
+    if not domain:
+        return jsonify({"error": "ドメインを入力してください"}), 400
+    # URL形式で渡された場合はホスト名を抽出
+    if domain.startswith(("http://", "https://")):
+        domain = _domain_of(domain)
+    domain = domain.lstrip(".")
+    if not domain or "/" in domain or " " in domain:
+        return jsonify({"error": "不正なドメイン形式です"}), 400
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT OR IGNORE INTO inquiry_blacklist (domain, reason, created_at) VALUES (?,?,?)",
+            (domain, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "domain": domain})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inquiry/blacklist/<int:bid>", methods=["DELETE"])
+def inquiry_blacklist_delete(bid: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM inquiry_blacklist WHERE id=?", (bid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== テンプレート管理 API =====
+@app.route("/api/inquiry/templates", methods=["GET"])
+def inquiry_templates_list():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, name, tag, template_json, updated_at FROM inquiry_templates ORDER BY updated_at DESC"
+    ).fetchall()
+    conn.close()
+    items = []
+    for r in rows:
+        try:
+            tpl = json.loads(r[3] or "{}")
+        except Exception:
+            tpl = {}
+        items.append({"id": r[0], "name": r[1], "tag": r[2], "template": tpl, "updated_at": r[4]})
+    return jsonify({"items": items})
+
+
+@app.route("/api/inquiry/templates", methods=["POST"])
+def inquiry_templates_save():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()[:100]
+    tag = (data.get("tag") or "").strip()[:50]
+    template = _normalize_inquiry_template(data.get("template") or {})
+    if not name:
+        return jsonify({"error": "テンプレート名を入力してください"}), 400
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        tid = data.get("id")
+        if tid:
+            conn.execute(
+                "UPDATE inquiry_templates SET name=?, tag=?, template_json=?, updated_at=? WHERE id=?",
+                (name, tag, json.dumps(template, ensure_ascii=False), now, int(tid)),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO inquiry_templates (name, tag, template_json, created_at, updated_at) VALUES (?,?,?,?,?)",
+                (name, tag, json.dumps(template, ensure_ascii=False), now, now),
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inquiry/templates/<int:tid>", methods=["DELETE"])
+def inquiry_templates_delete(tid: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM inquiry_templates WHERE id=?", (tid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.errorhandler(429)
