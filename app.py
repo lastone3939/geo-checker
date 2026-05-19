@@ -85,6 +85,99 @@ def init_db():
             created_at TEXT NOT NULL
         )
     """)
+    # 問い合わせフォーム営業 キャンペーン
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT UNIQUE,
+            template_json TEXT,
+            total_urls INTEGER DEFAULT 0,
+            success_count INTEGER DEFAULT 0,
+            failure_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            dry_run INTEGER DEFAULT 1,
+            ip TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # 問い合わせフォーム営業 個別送信結果
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER,
+            target_url TEXT,
+            form_url TEXT,
+            status TEXT,
+            detected_fields_json TEXT,
+            error_message TEXT,
+            http_status INTEGER,
+            submitted_at TEXT NOT NULL
+        )
+    """)
+    # NGドメインリスト（送信禁止）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_blacklist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain TEXT UNIQUE NOT NULL,
+            reason TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # 保存済みテンプレート
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            template_json TEXT NOT NULL,
+            tag TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    # バウンス済みメールアドレス（個別記録 + 同時にドメインをNGリストに自動登録）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_bounced_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            domain TEXT,
+            reason TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # メール一括送信キャンペーン
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT UNIQUE,
+            subject TEXT,
+            body TEXT,
+            from_name TEXT,
+            from_email TEXT,
+            total INTEGER DEFAULT 0,
+            success_count INTEGER DEFAULT 0,
+            failure_count INTEGER DEFAULT 0,
+            skipped_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            allow_resend INTEGER DEFAULT 0,
+            ip TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # メール送信履歴（重複防止 + 個別結果）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_sent_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER,
+            to_email TEXT NOT NULL,
+            status TEXT,
+            error_message TEXT,
+            sent_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_email_sent_log_email ON email_sent_log(to_email)")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -1364,6 +1457,637 @@ def run_video_job(job_id: str, url: str, effect: str = "normal"):
         app.logger.error(f"video job error: {e}")
 
 
+# ===================================================================
+# 問い合わせフォーム営業 自動化エンジン
+# ===================================================================
+
+INQUIRY_JOBS = {}  # job_id -> {status, progress, total, results, error, created_at}
+
+INQUIRY_CONTACT_PATHS = [
+    "/contact", "/contact/", "/contact.html", "/contact.php",
+    "/contactus", "/contactus/", "/contact-us", "/contact-us/",
+    "/inquiry", "/inquiry/", "/inquiry.html", "/inquiry.php",
+    "/form", "/form/", "/form.html",
+    "/otoiawase", "/otoiawase/", "/toiawase", "/toiawase/",
+    "/support", "/support/contact", "/help/contact",
+    "/ja/contact", "/ja/inquiry",
+]
+
+INQUIRY_CONTACT_KEYWORDS = [
+    "お問い合わせ", "お問合せ", "お問合わせ", "問い合わせ", "問合せ",
+    "ご相談", "お見積", "見積り", "資料請求",
+    "contact", "inquiry", "inquiries", "enquiry", "support",
+    "get in touch", "reach us", "reach out",
+]
+
+FIELD_PATTERNS = {
+    # 複合ラベル（"会社名"の"名"を"名前"に誤分類しないよう、特異的なものを先に評価）
+    "email_confirm": [r"メール.*確認", r"確認.*メール", r"email.*confirm", r"confirm.*email"],
+    "company": [
+        r"会社名", r"企業名", r"法人名", r"団体名", r"組織名", r"貴社名", r"社名", r"屋号",
+        r"\bcompany\b", r"corporation", r"organization", r"organisation",
+    ],
+    "department": [r"部署", r"所属", r"部門", r"department", r"division"],
+    "position": [r"役職", r"\btitle\b", r"position", r"job[-_ ]?title"],
+    "subject": [
+        r"件名", r"タイトル", r"題名", r"用件",
+        r"subject", r"title", r"\btopic\b",
+    ],
+    "category": [r"種別", r"カテゴリ", r"ご用件", r"お問い合わせ種別", r"inquiry[-_ ]?type", r"category"],
+    "zip": [r"郵便番号", r"〒", r"zip", r"postal"],
+    "address": [r"住所", r"所在地", r"address", r"addr"],
+    "url": [r"URL", r"ウェブ", r"ホームページ", r"サイト", r"website", r"web_?site", r"homepage"],
+    "fax": [r"FAX", r"ファックス", r"ファクス"],
+    "email": [r"メール", r"e[-_ ]?mail", r"mailaddress", r"mail_addr"],
+    "phone": [
+        r"電話", r"TEL", r"tel_?no", r"phone", r"mobile", r"携帯",
+        r"連絡先(?!.*メール)",
+    ],
+    "kana": [r"ふりがな", r"フリガナ", r"カナ", r"kana", r"furigana"],
+    # 氏名系（より限定的なパターン）
+    "name": [
+        r"お名前", r"名前", r"氏名", r"ご担当者", r"担当者名", r"担当者", r"姓名",
+        r"\bname\b", r"your[-_ ]?name", r"full[-_ ]?name", r"fullname",
+        r"contact[-_ ]?name", r"user[-_ ]?name",
+    ],
+    "last_name": [r"^姓$", r"苗字", r"\bsei\b", r"last[-_ ]?name", r"family[-_ ]?name"],
+    "first_name": [r"first[-_ ]?name", r"given[-_ ]?name", r"\bmei\b"],
+    # 本文系は最後（"内容"が"会社名"後に来るように）
+    "message": [
+        r"本文", r"メッセージ", r"お問い合わせ内容", r"問い合わせ内容",
+        r"ご相談内容", r"ご要望", r"ご質問", r"コメント", r"備考",
+        r"お問い合わせ", r"問い合わせ",
+        r"message", r"inquiry", r"content", r"\bbody\b", r"comment",
+        r"detail", r"description", r"remark",
+        r"^内容$", r"内容\b",
+    ],
+    "agree": [r"同意", r"承諾", r"承認", r"プライバシー", r"個人情報", r"privacy", r"agree", r"consent", r"terms"],
+}
+
+CAPTCHA_SIGNATURES = [
+    "g-recaptcha", "h-captcha", "hcaptcha", "cf-turnstile", "turnstile",
+    "data-sitekey", "recaptcha/api.js", "hcaptcha.com/1/api.js",
+    "challenges.cloudflare.com",
+]
+
+INQUIRY_SUCCESS_MARKERS = [
+    "ありがとうございました", "ありがとうございます", "送信が完了", "送信完了",
+    "受け付けました", "受付けました", "受け付け完了", "送信されました",
+    "thank you", "thanks for", "we have received", "successfully sent",
+    "message sent", "submission received",
+]
+INQUIRY_CONFIRM_MARKERS = [
+    "確認画面", "入力内容の確認", "ご確認ください", "内容をご確認", "確認してください",
+    "confirm", "confirmation", "please confirm", "review your",
+]
+
+
+def _html_text_lower(element):
+    try:
+        return element.get_text(" ", strip=True).lower()
+    except Exception:
+        return ""
+
+
+def find_inquiry_form_page(base_url: str, session: requests.Session):
+    """トップページ→共通パス→リンク文字列から問い合わせフォームのURLを探す"""
+    parsed = urlparse(base_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+
+    candidates = []
+
+    # 1) トップページをパースしてリンクを収集
+    try:
+        resp = session.get(base_url, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
+        if resp.status_code == 200:
+            resp.encoding = resp.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                href = a.get("href", "").strip()
+                if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+                    continue
+                label = (a.get_text(" ", strip=True) or "") + " " + href
+                label_lower = label.lower()
+                for kw in INQUIRY_CONTACT_KEYWORDS:
+                    if kw.lower() in label_lower:
+                        full = urljoin(base_url, href)
+                        if urlparse(full).netloc == parsed.netloc:
+                            candidates.append(full)
+                        break
+    except Exception:
+        pass
+
+    # 2) 共通パスを総当たり
+    for path in INQUIRY_CONTACT_PATHS:
+        candidates.append(urljoin(root, path))
+
+    # 重複排除（順序維持）
+    seen = set()
+    unique = []
+    for u in candidates:
+        if u not in seen:
+            seen.add(u)
+            unique.append(u)
+
+    # 3) <form> を含む最初のページを採用
+    for candidate in unique[:20]:
+        try:
+            if not is_safe_url(candidate):
+                continue
+            r = session.get(candidate, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
+            if r.status_code != 200:
+                continue
+            r.encoding = r.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(r.text, "html.parser")
+            forms = soup.find_all("form")
+            for form in forms:
+                # 明らかに検索フォームは除外
+                if _looks_like_search_form(form):
+                    continue
+                # textarea または message系 input があるフォームを採用
+                if form.find("textarea") or len(form.find_all(["input", "textarea"])) >= 3:
+                    return r.url, r.text, form
+    # テキストエリアがないが3件以上の場合も採用（検討済み）
+        except Exception:
+            continue
+
+    return None, None, None
+
+
+def _looks_like_search_form(form) -> bool:
+    action = (form.get("action") or "").lower()
+    if "search" in action or "?s=" in action:
+        return True
+    inputs = form.find_all("input")
+    if len(inputs) <= 2 and not form.find("textarea"):
+        names = " ".join((i.get("name") or "") for i in inputs).lower()
+        if "search" in names or "keyword" in names or names.strip() in ("q", "s"):
+            return True
+    return False
+
+
+def _field_label_text(field, soup) -> str:
+    """input/textarea/selectに紐づくlabelやplaceholderを集約"""
+    parts = []
+    for attr in ("name", "id", "placeholder", "aria-label", "title"):
+        v = field.get(attr)
+        if v:
+            parts.append(str(v))
+    field_id = field.get("id")
+    if field_id:
+        lbl = soup.find("label", attrs={"for": field_id})
+        if lbl:
+            parts.append(lbl.get_text(" ", strip=True))
+    parent_label = field.find_parent("label")
+    if parent_label:
+        parts.append(parent_label.get_text(" ", strip=True))
+    # 直前のth/dt/div のテキストも拾う
+    row = field.find_parent(["tr", "dl", "li", "div"])
+    if row:
+        head = row.find(["th", "dt"])
+        if head:
+            parts.append(head.get_text(" ", strip=True))
+    return " ".join(parts)
+
+
+def classify_field(label_blob: str) -> str:
+    """フィールドのラベル情報から意味カテゴリを判定"""
+    text = (label_blob or "").lower()
+    if not text:
+        return ""
+    for category, patterns in FIELD_PATTERNS.items():
+        for pat in patterns:
+            if re.search(pat, text, re.IGNORECASE):
+                return category
+    return ""
+
+
+def parse_form(html: str, form_url: str):
+    """フォーム構造を解析して送信可能な情報を返す"""
+    soup = BeautifulSoup(html, "html.parser")
+    # CAPTCHA検出
+    lower_html = html.lower()
+    captcha_hit = any(sig in lower_html for sig in CAPTCHA_SIGNATURES)
+
+    # 最も妥当なformを選択（search除外・textarea優先）
+    forms = soup.find_all("form")
+    target_form = None
+    for form in forms:
+        if _looks_like_search_form(form):
+            continue
+        if form.find("textarea"):
+            target_form = form
+            break
+    if target_form is None:
+        for form in forms:
+            if not _looks_like_search_form(form) and len(form.find_all(["input", "textarea"])) >= 3:
+                target_form = form
+                break
+    if target_form is None:
+        return None
+
+    action = target_form.get("action") or form_url
+    action = urljoin(form_url, action)
+    method = (target_form.get("method") or "get").lower()
+    enctype = (target_form.get("enctype") or "application/x-www-form-urlencoded").lower()
+
+    fields = []
+    for elem in target_form.find_all(["input", "textarea", "select"]):
+        name = elem.get("name")
+        if not name:
+            continue
+        tag = elem.name
+        input_type = (elem.get("type") or "").lower() if tag == "input" else tag
+        label_blob = _field_label_text(elem, soup)
+        category = classify_field(label_blob + " " + name)
+
+        options = []
+        if tag == "select":
+            for opt in elem.find_all("option"):
+                options.append({
+                    "value": opt.get("value") if opt.get("value") is not None else opt.get_text(strip=True),
+                    "text": opt.get_text(strip=True),
+                    "selected": opt.has_attr("selected"),
+                })
+
+        fields.append({
+            "name": name,
+            "tag": tag,
+            "type": input_type,
+            "value": elem.get("value", ""),
+            "required": elem.has_attr("required"),
+            "label": label_blob[:200],
+            "category": category,
+            "options": options,
+            "checked": elem.has_attr("checked"),
+        })
+
+    return {
+        "action": action,
+        "method": method,
+        "enctype": enctype,
+        "fields": fields,
+        "has_captcha": captcha_hit,
+    }
+
+
+def _choose_select_value(field: dict, template: dict) -> str:
+    """selectの適切な選択肢を決定"""
+    options = field.get("options") or []
+    if not options:
+        return ""
+    category = field.get("category", "")
+    # カテゴリ系はテンプレートの inquiry_category を使う、合致候補から選ぶ
+    if category == "category":
+        desired = (template.get("inquiry_category") or "").lower()
+        for opt in options:
+            text = (opt.get("text") or "").lower()
+            if desired and desired in text:
+                return opt["value"]
+        for opt in options:
+            text = (opt.get("text") or "")
+            if any(kw in text for kw in ["その他", "ご相談", "お問い合わせ", "一般", "営業", "サービス"]):
+                return opt["value"]
+    # デフォルト: 選択済み → 先頭の非空
+    for opt in options:
+        if opt.get("selected"):
+            return opt["value"]
+    for opt in options:
+        v = opt.get("value")
+        t = (opt.get("text") or "").strip()
+        if v and v.strip() and t and t not in ("選択してください", "--", "---", "please select"):
+            return v
+    return options[0]["value"] if options else ""
+
+
+def build_submission_data(form_info: dict, template: dict) -> tuple:
+    """フォーム情報とテンプレートから送信データを構築"""
+    data = {}
+    mapping = []
+    template_map = {
+        "name": template.get("name", ""),
+        "kana": template.get("kana", ""),
+        "last_name": template.get("last_name") or (template.get("name", "").split(" ")[0] if template.get("name") else ""),
+        "first_name": template.get("first_name") or (template.get("name", "").split(" ", 1)[1] if " " in template.get("name", "") else ""),
+        "company": template.get("company", ""),
+        "department": template.get("department", ""),
+        "position": template.get("position", ""),
+        "email": template.get("email", ""),
+        "email_confirm": template.get("email", ""),
+        "phone": template.get("phone", ""),
+        "fax": template.get("fax", ""),
+        "zip": template.get("zip", ""),
+        "address": template.get("address", ""),
+        "url": template.get("url", ""),
+        "subject": template.get("subject", ""),
+        "message": template.get("message", ""),
+    }
+    # radio/checkbox は同名のグループ単位で処理するため、最後の値が勝つ仕様をうまく使う
+    radio_groups = {}
+    for f in form_info["fields"]:
+        if f["type"] == "radio":
+            radio_groups.setdefault(f["name"], []).append(f)
+
+    for f in form_info["fields"]:
+        name = f["name"]
+        tag = f["tag"]
+        type_ = f["type"]
+        category = f["category"]
+
+        if type_ in ("submit", "button", "image", "reset", "file"):
+            continue
+
+        if type_ == "hidden":
+            data[name] = f["value"]
+            continue
+
+        if tag == "textarea":
+            # textareaは基本 message として扱う（category優先）
+            val = template_map.get(category) if category in template_map else None
+            data[name] = val or template_map["message"]
+            mapping.append({"name": name, "category": category or "message", "filled": True})
+            continue
+
+        if tag == "select":
+            data[name] = _choose_select_value(f, template)
+            mapping.append({"name": name, "category": category or "select", "filled": bool(data[name])})
+            continue
+
+        if type_ == "checkbox":
+            # 同意系は必ずチェック、その他はデフォルト維持
+            if category == "agree" or any(kw in (f["label"] or "") for kw in ["同意", "承諾", "プライバシー", "agree", "consent"]):
+                data.setdefault(name, f["value"] or "on")
+            elif f["checked"]:
+                data.setdefault(name, f["value"] or "on")
+            mapping.append({"name": name, "category": category or "checkbox", "filled": name in data})
+            continue
+
+        if type_ == "radio":
+            # グループで未設定の場合のみ先頭/checkedを選ぶ
+            if name in data:
+                continue
+            group = radio_groups.get(name, [])
+            chosen = next((g for g in group if g["checked"]), None) or (group[0] if group else None)
+            if chosen:
+                data[name] = chosen["value"] or "1"
+            mapping.append({"name": name, "category": category or "radio", "filled": name in data})
+            continue
+
+        # 通常のtext/email/tel/url/number
+        val = ""
+        if category and template_map.get(category):
+            val = template_map[category]
+        elif type_ == "email" and template_map["email"]:
+            val = template_map["email"]
+        elif type_ == "tel" and template_map["phone"]:
+            val = template_map["phone"]
+        elif type_ == "url" and template_map["url"]:
+            val = template_map["url"]
+        elif f["required"]:
+            # 必須で分類できないフィールドは message を入れてお茶を濁す
+            val = template_map["message"][:50]
+        data[name] = val
+        mapping.append({"name": name, "category": category or type_, "filled": bool(val)})
+
+    return data, mapping
+
+
+def _check_submission_result(html: str) -> str:
+    """送信後のHTMLから結果を判定: sent / confirm / error"""
+    lower = (html or "").lower()
+    if any(mark.lower() in lower for mark in INQUIRY_SUCCESS_MARKERS):
+        return "sent"
+    if any(mark.lower() in lower for mark in INQUIRY_CONFIRM_MARKERS):
+        return "confirm"
+    # エラー検出
+    if any(kw in lower for kw in ["エラー", "error", "必須", "required", "入力してください", "入力に誤り"]):
+        return "error"
+    return "unknown"
+
+
+def process_single_inquiry(target_url: str, template: dict, dry_run: bool = True, timeout: int = 20) -> dict:
+    """1件の問い合わせフォーム処理。結果dictを返す"""
+    result = {
+        "target_url": target_url,
+        "form_url": None,
+        "status": "failed",
+        "http_status": None,
+        "detected_fields": [],
+        "submission_data": {},
+        "error": None,
+    }
+    try:
+        if not target_url.startswith(("http://", "https://")):
+            target_url = "https://" + target_url
+        if not is_safe_url(target_url):
+            result["error"] = "安全でないURLです"
+            result["status"] = "skipped"
+            return result
+
+        session = requests.Session()
+        session.headers.update(HEADERS)
+
+        form_url, form_html, _ = find_inquiry_form_page(target_url, session)
+        if not form_url:
+            result["error"] = "問い合わせフォームが見つかりませんでした"
+            result["status"] = "no_form"
+            return result
+
+        result["form_url"] = form_url
+        form_info = parse_form(form_html, form_url)
+        if not form_info:
+            result["error"] = "フォームの解析に失敗しました"
+            result["status"] = "no_form"
+            return result
+
+        if form_info["has_captcha"]:
+            result["error"] = "CAPTCHAが設置されているためスキップしました"
+            result["status"] = "captcha"
+            result["detected_fields"] = form_info["fields"]
+            return result
+
+        data, mapping = build_submission_data(form_info, template)
+        result["detected_fields"] = mapping
+        result["submission_data"] = {k: v for k, v in data.items() if not k.lower().startswith(("_token", "csrf"))}
+
+        if dry_run:
+            result["status"] = "preview"
+            return result
+
+        # 送信
+        method = form_info["method"]
+        action = form_info["action"]
+        send = session.post if method == "post" else session.get
+        resp = send(action, data=data, headers=HEADERS, timeout=timeout, allow_redirects=True)
+        result["http_status"] = resp.status_code
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        body = resp.text or ""
+        outcome = _check_submission_result(body)
+
+        # 確認画面 → もう一度submit
+        if outcome == "confirm":
+            soup2 = BeautifulSoup(body, "html.parser")
+            confirm_form = None
+            for form in soup2.find_all("form"):
+                if _looks_like_search_form(form):
+                    continue
+                btn = form.find("input", attrs={"type": "submit"}) or form.find("button")
+                btn_text = (btn.get("value") if btn and btn.name == "input" else (btn.get_text(" ", strip=True) if btn else "")) or ""
+                if any(kw in btn_text for kw in ["送信", "submit", "送る", "確定", "この内容で"]):
+                    confirm_form = form
+                    break
+            if confirm_form is None and soup2.find_all("form"):
+                confirm_form = soup2.find_all("form")[-1]
+            if confirm_form is not None:
+                action2 = urljoin(resp.url, confirm_form.get("action") or resp.url)
+                method2 = (confirm_form.get("method") or "post").lower()
+                data2 = {}
+                for el in confirm_form.find_all(["input", "textarea", "select"]):
+                    nm = el.get("name")
+                    if not nm:
+                        continue
+                    t = (el.get("type") or "").lower()
+                    if t in ("submit", "button", "image", "reset"):
+                        # 送信ボタン名も一応含める
+                        data2[nm] = el.get("value", "")
+                        continue
+                    data2[nm] = el.get("value", "")
+                send2 = session.post if method2 == "post" else session.get
+                resp2 = send2(action2, data=data2, headers=HEADERS, timeout=timeout, allow_redirects=True)
+                result["http_status"] = resp2.status_code
+                resp2.encoding = resp2.apparent_encoding or "utf-8"
+                outcome = _check_submission_result(resp2.text or "")
+
+        if outcome == "sent":
+            result["status"] = "sent"
+        elif outcome == "error":
+            result["status"] = "failed"
+            result["error"] = "送信後にエラー表示を検出しました"
+        else:
+            # 2xx かつ判定不能 → 送信成功の可能性高いが unknown
+            if 200 <= (result["http_status"] or 0) < 400:
+                result["status"] = "sent_unknown"
+            else:
+                result["status"] = "failed"
+                result["error"] = f"HTTP {result['http_status']}"
+    except requests.exceptions.Timeout:
+        result["error"] = "タイムアウト"
+        result["status"] = "failed"
+    except Exception as e:
+        result["error"] = str(e)[:300]
+        result["status"] = "failed"
+    return result
+
+
+def _domain_of(url: str) -> str:
+    try:
+        host = (urlparse(url).hostname or "").lower()
+        return host[4:] if host.startswith("www.") else host
+    except Exception:
+        return ""
+
+
+def _load_blacklist_domains() -> set:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute("SELECT domain FROM inquiry_blacklist").fetchall()
+        conn.close()
+        return {r[0].strip().lower() for r in rows if r[0]}
+    except Exception:
+        return set()
+
+
+def _load_already_sent_domains() -> set:
+    """過去に sent / sent_unknown / preview ステータスで送信成功したドメイン"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT target_url FROM inquiry_submissions WHERE status IN ('sent','sent_unknown')"
+        ).fetchall()
+        conn.close()
+        return {_domain_of(r[0]) for r in rows if r[0] and _domain_of(r[0])}
+    except Exception:
+        return set()
+
+
+def run_inquiry_job(job_id: str, urls: list, template: dict, dry_run: bool, delay_seconds: float, ip: str = "",
+                    skip_duplicates: bool = True, skip_blacklist: bool = True):
+    """問い合わせフォーム営業ジョブをバックグラウンド実行"""
+    try:
+        INQUIRY_JOBS[job_id]["status"] = "running"
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO inquiry_campaigns (job_id, template_json, total_urls, status, dry_run, ip, created_at) VALUES (?,?,?,?,?,?,?)",
+            (job_id, json.dumps(template, ensure_ascii=False), len(urls), "running", 1 if dry_run else 0, ip, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        conn.commit()
+        campaign_id = conn.execute("SELECT id FROM inquiry_campaigns WHERE job_id=?", (job_id,)).fetchone()[0]
+        conn.close()
+
+        blacklist = _load_blacklist_domains() if skip_blacklist else set()
+        already_sent = _load_already_sent_domains() if (skip_duplicates and not dry_run) else set()
+
+        success_count = 0
+        failure_count = 0
+        for idx, url in enumerate(urls):
+            if INQUIRY_JOBS.get(job_id, {}).get("cancel"):
+                break
+            dom = _domain_of(url)
+            if dom and dom in blacklist:
+                res = {"target_url": url, "form_url": None, "status": "skipped_blacklist",
+                       "http_status": None, "detected_fields": [], "submission_data": {},
+                       "error": f"NGドメイン: {dom}"}
+            elif dom and dom in already_sent:
+                res = {"target_url": url, "form_url": None, "status": "skipped_duplicate",
+                       "http_status": None, "detected_fields": [], "submission_data": {},
+                       "error": f"過去に送信済み: {dom}"}
+            else:
+                res = process_single_inquiry(url, template, dry_run=dry_run)
+                if res["status"] in ("sent", "sent_unknown") and dom:
+                    already_sent.add(dom)
+            INQUIRY_JOBS[job_id]["results"].append(res)
+            INQUIRY_JOBS[job_id]["progress"] = idx + 1
+            if res["status"] in ("sent", "sent_unknown", "preview"):
+                success_count += 1
+            else:
+                failure_count += 1
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "INSERT INTO inquiry_submissions (campaign_id, target_url, form_url, status, detected_fields_json, error_message, http_status, submitted_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (
+                        campaign_id, res["target_url"], res.get("form_url"), res["status"],
+                        json.dumps(res.get("detected_fields") or [], ensure_ascii=False),
+                        res.get("error"), res.get("http_status"),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    )
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            # スキップ（ブラックリスト・重複）の場合は通信していないので待機しない
+            was_skipped = res["status"].startswith("skipped")
+            if idx < len(urls) - 1 and delay_seconds > 0 and not was_skipped:
+                time.sleep(delay_seconds)
+
+        INQUIRY_JOBS[job_id]["status"] = "done"
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "UPDATE inquiry_campaigns SET success_count=?, failure_count=?, status=? WHERE id=?",
+                (success_count, failure_count, "done", campaign_id)
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+    except Exception as e:
+        INQUIRY_JOBS[job_id]["status"] = "error"
+        INQUIRY_JOBS[job_id]["error"] = str(e)
+        app.logger.error(f"inquiry job error: {e}")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -2137,6 +2861,1245 @@ def chat():
     except Exception as e:
         app.logger.error(f"chat error: {e}")
         return jsonify({"error": "チャット応答の生成に失敗しました"}), 500
+
+
+# ===================================================================
+# 問い合わせフォーム営業 API
+# ===================================================================
+
+def _normalize_inquiry_template(raw: dict) -> dict:
+    """フロントから届いたテンプレートを正規化・サニタイズ"""
+    tpl = {
+        "name": (raw.get("name") or "").strip()[:100],
+        "kana": (raw.get("kana") or "").strip()[:100],
+        "last_name": (raw.get("last_name") or "").strip()[:50],
+        "first_name": (raw.get("first_name") or "").strip()[:50],
+        "company": (raw.get("company") or "").strip()[:200],
+        "department": (raw.get("department") or "").strip()[:100],
+        "position": (raw.get("position") or "").strip()[:100],
+        "email": (raw.get("email") or "").strip()[:200],
+        "phone": (raw.get("phone") or "").strip()[:50],
+        "fax": (raw.get("fax") or "").strip()[:50],
+        "zip": (raw.get("zip") or "").strip()[:20],
+        "address": (raw.get("address") or "").strip()[:300],
+        "url": (raw.get("url") or "").strip()[:300],
+        "subject": (raw.get("subject") or "").strip()[:200],
+        "message": (raw.get("message") or "").strip()[:4000],
+        "inquiry_category": (raw.get("inquiry_category") or "").strip()[:50],
+    }
+    return tpl
+
+
+@app.route("/api/inquiry/detect", methods=["POST"])
+@limiter.limit("10 per minute;60 per hour")
+def inquiry_detect():
+    """単一URLのフォーム検出（ドライラン用プレビュー）"""
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "URLを入力してください"}), 400
+    template = _normalize_inquiry_template(data.get("template") or {})
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    if not is_safe_url(url):
+        return jsonify({"error": "このURLは診断できません"}), 400
+    result = process_single_inquiry(url, template, dry_run=True)
+    return jsonify(result)
+
+
+@app.route("/api/inquiry/send", methods=["POST"])
+@limiter.limit("3 per minute;20 per hour;100 per day")
+def inquiry_send():
+    """問い合わせフォーム営業キャンペーンを開始（バックグラウンド実行）"""
+    data = request.get_json(silent=True) or {}
+    template = _normalize_inquiry_template(data.get("template") or {})
+    urls_raw = data.get("urls") or []
+    if isinstance(urls_raw, str):
+        urls_raw = [u for u in re.split(r"[\r\n,、\s]+", urls_raw) if u.strip()]
+    urls = []
+    for u in urls_raw:
+        u = str(u).strip()
+        if not u:
+            continue
+        if not u.startswith(("http://", "https://")):
+            u = "https://" + u
+        urls.append(u)
+    urls = list(dict.fromkeys(urls))  # 重複除去
+    if not urls:
+        return jsonify({"error": "対象URLを1件以上入力してください"}), 400
+    if len(urls) > 200:
+        return jsonify({"error": "一度に実行できるURLは200件までです"}), 400
+
+    dry_run = bool(data.get("dry_run", True))
+    skip_duplicates = bool(data.get("skip_duplicates", True))
+    skip_blacklist = bool(data.get("skip_blacklist", True))
+    # 送信レート: rate_per_minute（1分あたりN通）優先、互換でdelay_secondsも受付
+    rate_per_minute = data.get("rate_per_minute")
+    if rate_per_minute is not None:
+        try:
+            rate = float(rate_per_minute)
+        except Exception:
+            rate = 5.0
+        rate = max(1.0, min(rate, 60.0))
+        delay = 60.0 / rate
+    else:
+        try:
+            delay = float(data.get("delay_seconds", 12.0))
+        except Exception:
+            delay = 12.0
+    delay = max(0.0, min(delay, 60.0))
+
+    # 本番送信には最低限 name/email/message が必要
+    if not dry_run:
+        missing = [k for k in ("name", "email", "message") if not template.get(k)]
+        if missing:
+            return jsonify({"error": f"本番送信には次の項目が必須です: {', '.join(missing)}"}), 400
+
+    job_id = str(uuid.uuid4())
+    INQUIRY_JOBS[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "total": len(urls),
+        "results": [],
+        "error": None,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    ip = get_remote_address()
+    threading.Thread(
+        target=run_inquiry_job,
+        args=(job_id, urls, template, dry_run, delay, ip, skip_duplicates, skip_blacklist),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})
+
+
+@app.route("/api/inquiry/status/<job_id>")
+def inquiry_status(job_id: str):
+    job = INQUIRY_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify({
+        "status": job["status"],
+        "progress": job["progress"],
+        "total": job["total"],
+        "results": job["results"],
+        "error": job.get("error"),
+    })
+
+
+@app.route("/api/inquiry/cancel/<job_id>", methods=["POST"])
+def inquiry_cancel(job_id: str):
+    job = INQUIRY_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    job["cancel"] = True
+    return jsonify({"ok": True})
+
+
+@app.route("/api/inquiry/generate-message", methods=["POST"])
+@limiter.limit("10 per minute;50 per hour")
+def inquiry_generate_message():
+    """Geminiで営業文面（件名+本文）を自動生成"""
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "Gemini APIキーが未設定です"}), 503
+    data = request.get_json(silent=True) or {}
+    sender_name = (data.get("sender_name") or "").strip()[:100]
+    sender_company = (data.get("sender_company") or "").strip()[:200]
+    service_description = (data.get("service") or "").strip()[:1000]
+    target_industry = (data.get("target_industry") or "").strip()[:200]
+    tone = (data.get("tone") or "丁寧").strip()[:50]
+    if not service_description:
+        return jsonify({"error": "提案するサービス内容を入力してください"}), 400
+
+    prompt = f"""あなたはBtoB営業のプロです。問い合わせフォームから送信する営業メッセージを生成してください。
+
+# 送信者情報
+- 担当者名: {sender_name or "（未指定）"}
+- 会社名: {sender_company or "（未指定）"}
+
+# 提案するサービス
+{service_description}
+
+# 送信先業種
+{target_industry or "（業種指定なし・汎用）"}
+
+# トーン
+{tone}
+
+# 要件
+- 件名: 簡潔に20文字前後、開封したくなる内容
+- 本文: 200〜400字、突然のご連絡へのお詫び→自己紹介→相手のメリット→具体的な提案→次のアクション
+- 過度な売り込み感を避け、相手の課題解決を中心に書く
+- 末尾に署名（担当者名・会社名）を含める
+- 絵文字や記号の装飾は不要
+
+JSONで返してください:
+{{"subject": "...", "message": "..."}}
+"""
+    try:
+        result = call_gemini(prompt)
+        subject = (result.get("subject") or "").strip()
+        message = (result.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "生成に失敗しました"}), 500
+        return jsonify({"subject": subject, "message": message})
+    except Exception as e:
+        app.logger.error(f"inquiry generate error: {e}")
+        return jsonify({"error": "文面生成に失敗しました"}), 500
+
+
+@app.route("/api/inquiry/retry/<int:campaign_id>", methods=["POST"])
+def inquiry_retry(campaign_id: int):
+    """指定キャンペーンの失敗URLのみを再実行"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        camp = conn.execute(
+            "SELECT id, template_json, dry_run FROM inquiry_campaigns WHERE id=?",
+            (campaign_id,)
+        ).fetchone()
+        if not camp:
+            conn.close()
+            return jsonify({"error": "キャンペーンが見つかりません"}), 404
+        failed_rows = conn.execute(
+            "SELECT target_url FROM inquiry_submissions WHERE campaign_id=? AND status IN ('failed','captcha','no_form','skipped')",
+            (campaign_id,)
+        ).fetchall()
+        conn.close()
+        urls = [r[0] for r in failed_rows if r[0]]
+        if not urls:
+            return jsonify({"error": "再実行対象（失敗・CAPTCHA・フォーム無し）のURLがありません"}), 400
+        template = json.loads(camp[1] or "{}")
+        dry_run = bool(camp[2])
+
+        job_id = str(uuid.uuid4())
+        INQUIRY_JOBS[job_id] = {
+            "status": "queued", "progress": 0, "total": len(urls),
+            "results": [], "error": None,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        ip = get_remote_address()
+        threading.Thread(
+            target=run_inquiry_job,
+            args=(job_id, urls, template, dry_run, 12.0, ip, True, True),  # 1分5通
+            daemon=True,
+        ).start()
+        return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})
+    except Exception as e:
+        app.logger.error(f"inquiry retry error: {e}")
+        return jsonify({"error": "再実行の開始に失敗しました"}), 500
+
+
+@app.route("/api/inquiry/export/<job_id>")
+def inquiry_export(job_id: str):
+    """キャンペーン結果をCSVでダウンロード（job_id または campaign_id を受付）"""
+    import csv
+    from io import StringIO
+    from flask import Response
+
+    rows = []
+    job = INQUIRY_JOBS.get(job_id)
+    if job and job.get("results"):
+        for r in job["results"]:
+            rows.append([
+                r.get("target_url", ""), r.get("form_url", "") or "",
+                r.get("status", ""), r.get("http_status") or "",
+                r.get("error") or "", "",
+            ])
+    else:
+        try:
+            cid = int(job_id)
+        except ValueError:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                row = conn.execute("SELECT id FROM inquiry_campaigns WHERE job_id=?", (job_id,)).fetchone()
+                conn.close()
+                if not row:
+                    return jsonify({"error": "見つかりません"}), 404
+                cid = row[0]
+            except Exception:
+                return jsonify({"error": "見つかりません"}), 404
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            for r in conn.execute(
+                "SELECT target_url, form_url, status, http_status, error_message, submitted_at "
+                "FROM inquiry_submissions WHERE campaign_id=? ORDER BY id ASC",
+                (cid,),
+            ).fetchall():
+                rows.append(list(r))
+            conn.close()
+        except Exception:
+            return jsonify({"error": "DB読込失敗"}), 500
+
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["target_url", "form_url", "status", "http_status", "error", "submitted_at"])
+    for r in rows:
+        w.writerow(r)
+    csv_bytes = ("﻿" + buf.getvalue()).encode("utf-8")  # ExcelでもUTF-8で読めるようBOM付き
+    return Response(
+        csv_bytes, mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="inquiry_{job_id}.csv"'},
+    )
+
+
+@app.route("/inquiry/dashboard")
+def inquiry_dashboard():
+    token = request.args.get("token", "")
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        abort(403)
+    conn = sqlite3.connect(DB_PATH)
+    campaigns = conn.execute(
+        "SELECT id, job_id, total_urls, success_count, failure_count, status, dry_run, created_at "
+        "FROM inquiry_campaigns ORDER BY id DESC LIMIT 100"
+    ).fetchall()
+    selected_id = request.args.get("campaign", "")
+    submissions = []
+    if selected_id:
+        try:
+            cid = int(selected_id)
+            submissions = conn.execute(
+                "SELECT id, target_url, form_url, status, http_status, error_message, submitted_at "
+                "FROM inquiry_submissions WHERE campaign_id=? ORDER BY id DESC LIMIT 500",
+                (cid,),
+            ).fetchall()
+        except Exception:
+            submissions = []
+    blacklist_rows = conn.execute(
+        "SELECT id, domain, reason, created_at FROM inquiry_blacklist ORDER BY id DESC LIMIT 200"
+    ).fetchall()
+    bounced_rows = conn.execute(
+        "SELECT id, email, domain, reason, created_at FROM inquiry_bounced_emails ORDER BY id DESC LIMIT 500"
+    ).fetchall()
+    # ドメイン別統計（直近1000件から集計）
+    submission_rows = conn.execute(
+        "SELECT target_url, status FROM inquiry_submissions ORDER BY id DESC LIMIT 1000"
+    ).fetchall()
+    conn.close()
+
+    domain_stats = {}
+    for url, st in submission_rows:
+        dom = _domain_of(url)
+        if not dom:
+            continue
+        s = domain_stats.setdefault(dom, {"total": 0, "sent": 0, "failed": 0})
+        s["total"] += 1
+        if st in ("sent", "sent_unknown"):
+            s["sent"] += 1
+        elif st in ("failed", "captcha", "no_form"):
+            s["failed"] += 1
+    top_domains = sorted(domain_stats.items(), key=lambda kv: -kv[1]["total"])[:15]
+
+    total_camps = len(campaigns)
+    sent_total = sum(c[3] or 0 for c in campaigns)
+    fail_total = sum(c[4] or 0 for c in campaigns)
+
+    rows_html = ""
+    for c in campaigns:
+        cid, jid, total, success, failure, status, dry, created = c
+        badge_dry = '<span style="background:#E8F0FE;color:#1A73E8;padding:2px 6px;border-radius:8px;font-size:11px;">DRY</span>' if dry else '<span style="background:#FCE8E6;color:#C5221F;padding:2px 6px;border-radius:8px;font-size:11px;">LIVE</span>'
+        status_color = {"running": "#FBBC04", "done": "#34A853", "error": "#EA4335"}.get(status, "#5F6368")
+        rows_html += (
+            f'<tr>'
+            f'<td>{cid}</td>'
+            f'<td>{badge_dry}</td>'
+            f'<td style="color:{status_color};font-weight:700;">{status}</td>'
+            f'<td>{total or 0}</td>'
+            f'<td style="color:#34A853;">{success or 0}</td>'
+            f'<td style="color:#EA4335;">{failure or 0}</td>'
+            f'<td>{created}</td>'
+            f'<td>'
+            f'<a href="/inquiry/dashboard?token={token}&campaign={cid}" style="color:#1A73E8;margin-right:8px;">詳細</a>'
+            f'<a href="/api/inquiry/export/{cid}" style="color:#1A73E8;margin-right:8px;">CSV</a>'
+            f'<button onclick="retryCampaign({cid})" style="background:#fff;border:1px solid #E8EAED;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:12px;">失敗再実行</button>'
+            f'</td>'
+            f'</tr>'
+        )
+
+    sub_html = ""
+    if submissions:
+        sub_html = '<h2>キャンペーン #' + str(selected_id) + ' の送信明細</h2><table><tr><th>#</th><th>対象URL</th><th>フォームURL</th><th>ステータス</th><th>HTTP</th><th>エラー</th><th>日時</th></tr>'
+        for s in submissions:
+            sid, turl, furl, st, hs, err, sa = s
+            color = {"sent": "#34A853", "sent_unknown": "#1A73E8", "preview": "#1A73E8",
+                     "no_form": "#FBBC04", "captcha": "#C5221F", "failed": "#EA4335"}.get(st, "#5F6368")
+            sub_html += (
+                f'<tr>'
+                f'<td>{sid}</td>'
+                f'<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="{turl}" target="_blank" rel="noopener">{turl}</a></td>'
+                f'<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{furl or "-"}</td>'
+                f'<td style="color:{color};font-weight:700;">{st}</td>'
+                f'<td>{hs or "-"}</td>'
+                f'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#C5221F;">{err or ""}</td>'
+                f'<td>{sa}</td>'
+                f'</tr>'
+            )
+        sub_html += '</table>'
+
+    # ドメイン別統計テーブル
+    domain_html = ""
+    if top_domains:
+        domain_html = '<table><tr><th>ドメイン</th><th>合計</th><th>成功</th><th>失敗</th><th>成功率</th><th>操作</th></tr>'
+        for dom, s in top_domains:
+            rate = round(s["sent"] / s["total"] * 100, 1) if s["total"] else 0
+            color = "#34A853" if rate >= 50 else ("#FBBC04" if rate >= 20 else "#EA4335")
+            domain_html += (
+                f'<tr><td>{dom}</td><td>{s["total"]}</td>'
+                f'<td style="color:#34A853;">{s["sent"]}</td>'
+                f'<td style="color:#EA4335;">{s["failed"]}</td>'
+                f'<td style="color:{color};font-weight:700;">{rate}%</td>'
+                f'<td><button onclick="addBlacklist(\'{dom}\')" style="background:#fff;border:1px solid #E8EAED;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px;">NGに追加</button></td>'
+                f'</tr>'
+            )
+        domain_html += '</table>'
+    else:
+        domain_html = '<p style="color:#5F6368;font-size:.9rem;">送信履歴がまだありません</p>'
+
+    # NGドメインテーブル
+    bl_html = '<table><tr><th>#</th><th>ドメイン</th><th>理由</th><th>登録日時</th><th>操作</th></tr>'
+    if blacklist_rows:
+        for r in blacklist_rows:
+            bid, dom, reason, ca = r
+            bl_html += (
+                f'<tr><td>{bid}</td><td>{dom}</td><td>{reason or "-"}</td><td>{ca}</td>'
+                f'<td><button onclick="deleteBlacklist({bid})" style="background:#fff;border:1px solid #EA4335;color:#EA4335;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px;">削除</button></td></tr>'
+            )
+    else:
+        bl_html += '<tr><td colspan="5" style="text-align:center;color:#5F6368;">NGドメイン未登録</td></tr>'
+    bl_html += '</table>'
+
+    # バウンステーブル
+    bounce_html = '<table><tr><th>#</th><th>メール</th><th>ドメイン</th><th>理由</th><th>登録日時</th><th>操作</th></tr>'
+    if bounced_rows:
+        for r in bounced_rows:
+            bid, em, dom, reason, ca = r
+            bounce_html += (
+                f'<tr><td>{bid}</td><td>{em}</td><td>{dom or "-"}</td><td>{reason or "-"}</td><td>{ca}</td>'
+                f'<td><button onclick="deleteBounced({bid})" style="background:#fff;border:1px solid #EA4335;color:#EA4335;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px;">削除</button></td></tr>'
+            )
+    else:
+        bounce_html += '<tr><td colspan="6" style="text-align:center;color:#5F6368;">バウンス記録なし</td></tr>'
+    bounce_html += '</table>'
+
+    return f"""<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<title>フォーム営業ダッシュボード</title>
+<style>
+body{{font-family:'Noto Sans JP',sans-serif;background:#F8F9FA;color:#202124;padding:2rem;max-width:1200px;margin:0 auto;}}
+h1{{font-size:1.5rem;font-weight:700;margin-bottom:1rem;color:#1A73E8;}}
+h2{{font-size:1.1rem;font-weight:700;margin:2rem 0 1rem;color:#202124;}}
+.stats{{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;}}
+.stat{{background:#fff;border:1px solid #E8EAED;border-radius:8px;padding:1rem 1.5rem;}}
+.stat-num{{font-size:1.8rem;font-weight:800;color:#1A73E8;}}
+.stat-label{{font-size:.85rem;color:#5F6368;}}
+table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:2rem;font-size:.9rem;}}
+th{{background:#F1F3F4;padding:.65rem .8rem;text-align:left;font-size:.82rem;color:#3C4043;}}
+td{{padding:.55rem .8rem;border-top:1px solid #F1F3F4;}}
+a{{color:#1A73E8;text-decoration:none;}}
+.back{{display:inline-block;margin-bottom:1rem;color:#5F6368;}}
+.add-form{{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}}
+.add-form input{{padding:.5rem .75rem;border:1px solid #E8EAED;border-radius:6px;font-size:.9rem;}}
+.add-form button{{padding:.5rem 1rem;background:#1A73E8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:.85rem;}}
+</style></head><body>
+<a href="/" class="back">← トップへ</a>
+<h1>📬 フォーム営業 ダッシュボード</h1>
+<div class="stats">
+  <div class="stat"><div class="stat-num">{total_camps}</div><div class="stat-label">キャンペーン数</div></div>
+  <div class="stat"><div class="stat-num" style="color:#34A853;">{sent_total}</div><div class="stat-label">累計成功</div></div>
+  <div class="stat"><div class="stat-num" style="color:#EA4335;">{fail_total}</div><div class="stat-label">累計失敗</div></div>
+  <div class="stat"><div class="stat-num" style="color:#5F6368;">{len(blacklist_rows)}</div><div class="stat-label">NGドメイン</div></div>
+  <div class="stat"><div class="stat-num" style="color:#B06000;">{len(bounced_rows)}</div><div class="stat-label">バウンス記録</div></div>
+</div>
+
+<h2>キャンペーン一覧</h2>
+<table>
+<tr><th>#</th><th>モード</th><th>状態</th><th>対象</th><th>成功</th><th>失敗</th><th>日時</th><th>操作</th></tr>
+{rows_html or '<tr><td colspan="8" style="text-align:center;color:#5F6368;">キャンペーンがまだありません</td></tr>'}
+</table>
+
+{sub_html}
+
+<h2>ドメイン別 成功率（直近1000件）</h2>
+{domain_html}
+
+<h2>NGドメイン管理</h2>
+<div class="add-form">
+  <input id="newDomain" placeholder="example.com" style="flex:1;min-width:200px;">
+  <input id="newReason" placeholder="理由（任意）" style="flex:1;min-width:200px;">
+  <button onclick="addBlacklistManual()">追加</button>
+</div>
+{bl_html}
+
+<h2>📮 バウンス済みメールアドレス</h2>
+<p style="font-size:.85rem;color:#5F6368;margin-bottom:.5rem;">
+  バウンスしたメールを貼り付けると、そのドメインが自動でNGリストに追加され、次回以降の送信で自動スキップされます。<br>
+  メーラーで受信したバウンス通知の本文をそのまま貼り付けてもOK（メールアドレスを自動抽出します）。
+</p>
+<textarea id="bouncedText" rows="4" placeholder="info@example.com&#10;contact@another.co.jp&#10;...またはバウンス通知メール本文をそのまま貼り付け" style="width:100%;padding:.6rem;border:1px solid #E8EAED;border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;margin-bottom:.5rem;"></textarea>
+<div class="add-form">
+  <input id="bouncedReason" placeholder="理由（任意・例: 5.1.1 user unknown）" style="flex:1;min-width:200px;">
+  <button onclick="addBouncedEmails()">バウンス登録 + NG自動追加</button>
+</div>
+{bounce_html}
+
+<script>
+async function retryCampaign(cid) {{
+  if (!confirm('失敗・CAPTCHA・フォーム無しのURLを再実行します。よろしいですか？')) return;
+  try {{
+    const r = await fetch('/api/inquiry/retry/' + cid, {{method:'POST'}});
+    const j = await r.json();
+    if (!r.ok) {{ alert('エラー: ' + j.error); return; }}
+    alert('再実行を開始しました（job_id: ' + j.job_id + ', 対象: ' + j.total + '件）');
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function addBlacklist(domain) {{
+  const reason = prompt('「' + domain + '」をNGドメインに追加します。理由（任意）:', '');
+  if (reason === null) return;
+  await postBlacklist(domain, reason);
+}}
+async function addBlacklistManual() {{
+  const d = document.getElementById('newDomain').value.trim();
+  const r = document.getElementById('newReason').value.trim();
+  if (!d) {{ alert('ドメインを入力してください'); return; }}
+  await postBlacklist(d, r);
+}}
+async function postBlacklist(domain, reason) {{
+  try {{
+    const r = await fetch('/api/inquiry/blacklist', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{domain: domain, reason: reason}}),
+    }});
+    const j = await r.json();
+    if (!r.ok) {{ alert('エラー: ' + j.error); return; }}
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function deleteBlacklist(bid) {{
+  if (!confirm('NGドメインを削除しますか？')) return;
+  try {{
+    const r = await fetch('/api/inquiry/blacklist/' + bid, {{method:'DELETE'}});
+    if (!r.ok) {{ alert('削除に失敗しました'); return; }}
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function addBouncedEmails() {{
+  const text = document.getElementById('bouncedText').value.trim();
+  const reason = document.getElementById('bouncedReason').value.trim();
+  if (!text) {{ alert('バウンスしたメールアドレスを貼り付けてください'); return; }}
+  try {{
+    const r = await fetch('/api/inquiry/bounced', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{text: text, reason: reason || 'bounce'}}),
+    }});
+    const j = await r.json();
+    if (!r.ok) {{ alert('エラー: ' + (j.error || 'unknown')); return; }}
+    alert('登録しました: ' + j.added_emails + ' 件のメール / NGドメインに ' + j.added_blacklist_domains + ' 件追加（入力 ' + j.total_input + ' 件）');
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function deleteBounced(bid) {{
+  if (!confirm('このバウンス記録を削除しますか？（NGドメイン側は別途管理）')) return;
+  try {{
+    const r = await fetch('/api/inquiry/bounced/' + bid, {{method:'DELETE'}});
+    if (!r.ok) {{ alert('削除に失敗しました'); return; }}
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+</script>
+</body></html>"""
+
+
+# ===== ブラックリスト管理 API =====
+@app.route("/api/inquiry/blacklist", methods=["GET"])
+def inquiry_blacklist_list():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, domain, reason, created_at FROM inquiry_blacklist ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+    return jsonify({"items": [{"id": r[0], "domain": r[1], "reason": r[2], "created_at": r[3]} for r in rows]})
+
+
+@app.route("/api/inquiry/blacklist", methods=["POST"])
+def inquiry_blacklist_add():
+    data = request.get_json(silent=True) or {}
+    domain = (data.get("domain") or "").strip().lower()
+    reason = (data.get("reason") or "").strip()[:200]
+    if not domain:
+        return jsonify({"error": "ドメインを入力してください"}), 400
+    # URL形式で渡された場合はホスト名を抽出
+    if domain.startswith(("http://", "https://")):
+        domain = _domain_of(domain)
+    domain = domain.lstrip(".")
+    if not domain or "/" in domain or " " in domain:
+        return jsonify({"error": "不正なドメイン形式です"}), 400
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT OR IGNORE INTO inquiry_blacklist (domain, reason, created_at) VALUES (?,?,?)",
+            (domain, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "domain": domain})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inquiry/blacklist/<int:bid>", methods=["DELETE"])
+def inquiry_blacklist_delete(bid: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM inquiry_blacklist WHERE id=?", (bid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== テンプレート管理 API =====
+@app.route("/api/inquiry/templates", methods=["GET"])
+def inquiry_templates_list():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, name, tag, template_json, updated_at FROM inquiry_templates ORDER BY updated_at DESC"
+    ).fetchall()
+    conn.close()
+    items = []
+    for r in rows:
+        try:
+            tpl = json.loads(r[3] or "{}")
+        except Exception:
+            tpl = {}
+        items.append({"id": r[0], "name": r[1], "tag": r[2], "template": tpl, "updated_at": r[4]})
+    return jsonify({"items": items})
+
+
+@app.route("/api/inquiry/templates", methods=["POST"])
+def inquiry_templates_save():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()[:100]
+    tag = (data.get("tag") or "").strip()[:50]
+    template = _normalize_inquiry_template(data.get("template") or {})
+    if not name:
+        return jsonify({"error": "テンプレート名を入力してください"}), 400
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        tid = data.get("id")
+        if tid:
+            conn.execute(
+                "UPDATE inquiry_templates SET name=?, tag=?, template_json=?, updated_at=? WHERE id=?",
+                (name, tag, json.dumps(template, ensure_ascii=False), now, int(tid)),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO inquiry_templates (name, tag, template_json, created_at, updated_at) VALUES (?,?,?,?,?)",
+                (name, tag, json.dumps(template, ensure_ascii=False), now, now),
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inquiry/templates/<int:tid>", methods=["DELETE"])
+def inquiry_templates_delete(tid: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM inquiry_templates WHERE id=?", (tid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===================================================================
+# メール一括送信エンジン
+# ===================================================================
+
+EMAIL_JOBS = {}  # job_id -> {status, progress, total, results, error, created_at}
+
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+
+
+def _extract_emails(text: str) -> list:
+    """テキストからメールアドレスを抽出（重複除去・小文字化）"""
+    if not text:
+        return []
+    seen = set()
+    out = []
+    for m in EMAIL_RE.findall(text):
+        e = m.strip().lower()
+        if e and e not in seen:
+            seen.add(e)
+            out.append(e)
+    return out
+
+
+def _merge_template_vars(text: str, row: dict) -> str:
+    """{{name}} などの差込変数を置換"""
+    if not text:
+        return ""
+    def _sub(m):
+        key = m.group(1).strip().lower()
+        return str(row.get(key, "") or "")
+    return re.sub(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}", _sub, text)
+
+
+def _send_email_smtp(to_email: str, subject: str, body: str, from_name: str, from_email: str, timeout: int = 30) -> tuple:
+    """SMTPでメール1通を送信。(ok, error_message) を返す"""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.header import Header
+    from email.utils import formataddr, make_msgid
+
+    if not SMTP_PASS:
+        return False, "SMTP_PASS が未設定です（環境変数を設定してください）"
+    sender = from_email or SMTP_FROM
+    display = from_name or sender
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = Header(subject or "", "utf-8")
+    msg["From"] = formataddr((str(Header(display, "utf-8")), sender))
+    msg["To"] = to_email
+    msg["Message-ID"] = make_msgid(domain=sender.split("@", 1)[-1] if "@" in sender else "localhost")
+    msg.attach(MIMEText(body or "", "plain", "utf-8"))
+    try:
+        if int(SMTP_PORT) == 465:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=timeout)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=timeout)
+            try:
+                server.starttls()
+            except Exception:
+                pass
+        try:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(sender, [to_email], msg.as_string())
+        finally:
+            try:
+                server.quit()
+            except Exception:
+                pass
+        return True, None
+    except smtplib.SMTPRecipientsRefused as e:
+        return False, f"宛先拒否: {e}"
+    except smtplib.SMTPSenderRefused as e:
+        return False, f"送信元拒否: {e}"
+    except smtplib.SMTPDataError as e:
+        return False, f"SMTPデータエラー: {e.smtp_code} {e.smtp_error}"
+    except smtplib.SMTPException as e:
+        return False, f"SMTPエラー: {e}"
+    except Exception as e:
+        return False, f"送信失敗: {e}"
+
+
+def _load_blacklist_emails_and_domains() -> tuple:
+    """NGドメインとバウンスメールの集合を返す"""
+    domains = set()
+    emails = set()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for r in conn.execute("SELECT domain FROM inquiry_blacklist").fetchall():
+            if r[0]:
+                domains.add(r[0].strip().lower())
+        for r in conn.execute("SELECT email FROM inquiry_bounced_emails").fetchall():
+            if r[0]:
+                emails.add(r[0].strip().lower())
+        conn.close()
+    except Exception:
+        pass
+    return domains, emails
+
+
+def _load_already_sent_emails() -> set:
+    """過去にsent成功したメールアドレス（外部ツールから取込んだ送信履歴も含む）"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT to_email FROM email_sent_log WHERE status IN ('sent','sent_external')"
+        ).fetchall()
+        conn.close()
+        return {r[0].strip().lower() for r in rows if r[0]}
+    except Exception:
+        return set()
+
+
+def run_email_job(job_id: str, recipients: list, subject_tpl: str, body_tpl: str,
+                  from_name: str, from_email: str, rate_per_minute: float,
+                  allow_resend: bool, skip_bounce: bool, ip: str = ""):
+    """メール一括送信ジョブ。recipients は [{email, name?, company?, ...}, ...]"""
+    try:
+        EMAIL_JOBS[job_id]["status"] = "running"
+        delay = max(0.0, 60.0 / max(1.0, min(rate_per_minute, 600.0)))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO email_campaigns (job_id, subject, body, from_name, from_email, total, status, allow_resend, ip, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (job_id, subject_tpl, body_tpl, from_name, from_email, len(recipients), "running", 1 if allow_resend else 0, ip, now),
+        )
+        conn.commit()
+        campaign_id = conn.execute("SELECT id FROM email_campaigns WHERE job_id=?", (job_id,)).fetchone()[0]
+        conn.close()
+
+        ng_domains, bounced = _load_blacklist_emails_and_domains() if skip_bounce else (set(), set())
+        already_sent = set() if allow_resend else _load_already_sent_emails()
+
+        success = 0
+        failure = 0
+        skipped = 0
+        for idx, row in enumerate(recipients):
+            if EMAIL_JOBS.get(job_id, {}).get("cancel"):
+                break
+            email = (row.get("email") or "").strip().lower()
+            if not email or "@" not in email:
+                res = {"email": email, "status": "failed", "error": "不正なメールアドレス"}
+                failure += 1
+            else:
+                domain = email.split("@", 1)[1]
+                if skip_bounce and email in bounced:
+                    res = {"email": email, "status": "skipped_bounce", "error": "バウンス済みアドレス"}
+                    skipped += 1
+                elif skip_bounce and domain in ng_domains:
+                    res = {"email": email, "status": "skipped_blacklist", "error": f"NGドメイン: {domain}"}
+                    skipped += 1
+                elif (not allow_resend) and email in already_sent:
+                    res = {"email": email, "status": "skipped_duplicate", "error": "過去に送信済み"}
+                    skipped += 1
+                else:
+                    subject = _merge_template_vars(subject_tpl, row)
+                    body = _merge_template_vars(body_tpl, row)
+                    ok, err = _send_email_smtp(email, subject, body, from_name, from_email)
+                    if ok:
+                        res = {"email": email, "status": "sent", "error": None}
+                        success += 1
+                        already_sent.add(email)
+                    else:
+                        res = {"email": email, "status": "failed", "error": err}
+                        failure += 1
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "INSERT INTO email_sent_log (campaign_id, to_email, status, error_message, sent_at) VALUES (?,?,?,?,?)",
+                    (campaign_id, email, res["status"], res.get("error"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            EMAIL_JOBS[job_id]["results"].append(res)
+            EMAIL_JOBS[job_id]["progress"] = idx + 1
+
+            # スキップ時は待機しない（送信していないので負荷ゼロ）
+            was_skipped = res["status"].startswith("skipped") or res["status"] == "failed" and "不正" in (res.get("error") or "")
+            if idx < len(recipients) - 1 and delay > 0 and not was_skipped:
+                time.sleep(delay)
+
+        EMAIL_JOBS[job_id]["status"] = "done"
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "UPDATE email_campaigns SET success_count=?, failure_count=?, skipped_count=?, status=? WHERE id=?",
+                (success, failure, skipped, "done", campaign_id),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+    except Exception as e:
+        EMAIL_JOBS[job_id]["status"] = "error"
+        EMAIL_JOBS[job_id]["error"] = str(e)
+        app.logger.error(f"email job error: {e}")
+
+
+def _parse_recipients(raw) -> list:
+    """テキストまたは配列を [{email, name, company, ...}, ...] に正規化"""
+    rows = []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str):
+                emails = _extract_emails(item)
+                for e in emails:
+                    rows.append({"email": e})
+            elif isinstance(item, dict):
+                e = (item.get("email") or "").strip().lower()
+                if e and "@" in e:
+                    rows.append({**item, "email": e})
+    elif isinstance(raw, str):
+        # 行ごとにCSV風にパース: email,name,company...
+        import csv
+        from io import StringIO
+        reader = csv.reader(StringIO(raw))
+        header = None
+        for row in reader:
+            if not row:
+                continue
+            cells = [c.strip() for c in row]
+            # ヘッダー行検出: セルの値がそのまま列名相当（"email"/"name"等の単語のみ）
+            HEADER_TOKENS = {"email", "mail", "e-mail", "メール", "メールアドレス",
+                             "name", "氏名", "お名前", "名前", "company", "会社名", "会社"}
+            if header is None and any(c.lower().strip() in HEADER_TOKENS for c in cells):
+                # かつ、どのセルにも実際のメアドが含まれていないこと
+                if not any(EMAIL_RE.search(c) for c in cells):
+                    header = [c.lower() for c in cells]
+                    continue
+            # email を探す
+            email = ""
+            other = {}
+            for i, c in enumerate(cells):
+                m = EMAIL_RE.search(c)
+                if m and not email:
+                    email = m.group(0).strip().lower()
+                if header and i < len(header):
+                    other[header[i]] = c
+            if email:
+                if header:
+                    other["email"] = email
+                    rows.append(other)
+                else:
+                    # ヘッダー無しの場合：先頭以外を name/company にする
+                    entry = {"email": email}
+                    for i, c in enumerate(cells):
+                        if c == email or EMAIL_RE.search(c):
+                            continue
+                        if i == 1 or "name" not in entry:
+                            entry["name"] = c
+                        elif "company" not in entry:
+                            entry["company"] = c
+                    rows.append(entry)
+    # 重複排除（email単位、最後の出現を優先）
+    dedup = {}
+    for r in rows:
+        dedup[r["email"]] = r
+    return list(dedup.values())
+
+
+@app.route("/api/email/send", methods=["POST"])
+@limiter.limit("3 per minute;20 per hour;500 per day")
+def email_send():
+    """メール一括送信を開始（バックグラウンド）"""
+    if not SMTP_PASS:
+        return jsonify({"error": "SMTP_PASS 環境変数が未設定です。運用環境に設定してください。"}), 503
+    data = request.get_json(silent=True) or {}
+    subject = (data.get("subject") or "").strip()
+    body = (data.get("body") or "").strip()
+    from_name = (data.get("from_name") or "").strip()[:100]
+    from_email = (data.get("from_email") or SMTP_FROM).strip()
+    try:
+        rate = float(data.get("rate_per_minute") or 5)
+    except Exception:
+        rate = 5.0
+    rate = max(1.0, min(rate, 60.0))
+    allow_resend = bool(data.get("allow_resend", False))
+    skip_bounce = bool(data.get("skip_bounce", True))
+
+    recipients_raw = data.get("recipients")
+    if recipients_raw is None:
+        recipients_raw = data.get("text") or ""
+    recipients = _parse_recipients(recipients_raw)
+    if not recipients:
+        return jsonify({"error": "送信先メールアドレスが見つかりませんでした"}), 400
+    if len(recipients) > 1000:
+        return jsonify({"error": "一度に送れるのは1000件までです"}), 400
+    if not subject:
+        return jsonify({"error": "件名を入力してください"}), 400
+    if not body:
+        return jsonify({"error": "本文を入力してください"}), 400
+
+    job_id = str(uuid.uuid4())
+    EMAIL_JOBS[job_id] = {
+        "status": "queued", "progress": 0, "total": len(recipients),
+        "results": [], "error": None,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    ip = get_remote_address()
+    threading.Thread(
+        target=run_email_job,
+        args=(job_id, recipients, subject, body, from_name, from_email, rate, allow_resend, skip_bounce, ip),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id, "total": len(recipients)})
+
+
+@app.route("/api/email/status/<job_id>")
+def email_status(job_id: str):
+    job = EMAIL_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify({
+        "status": job["status"],
+        "progress": job["progress"],
+        "total": job["total"],
+        "results": job["results"][-200:],  # 直近200件のみ
+        "error": job.get("error"),
+    })
+
+
+@app.route("/api/email/cancel/<job_id>", methods=["POST"])
+def email_cancel(job_id: str):
+    job = EMAIL_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    job["cancel"] = True
+    return jsonify({"ok": True})
+
+
+@app.route("/api/email/extract-pending", methods=["POST"])
+def email_extract_pending():
+    """Mail Sales GiveFast 等の一覧表を貼り付け、未送信(pending)のメアドだけを抽出。
+    入力: { text: "..." }
+    出力: { pending: [...], counts: {sent, unsubscribed, pending, unknown},
+            csv: "...", tsv: "..." }
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "テキストを貼り付けてください"}), 400
+
+    SENT_KEYWORDS = ["sent", "delivered", "送信済", "配信済", "opened", " open "]
+    UNSUB_KEYWORDS = ["unsubscribed", "unsub", "配信停止", "拒否", "オプトアウト", "解除"]
+    PENDING_KEYWORDS = ["pending", "queued", "未送信", "待機", "draft"]
+    FAILED_KEYWORDS = ["failed", "bounce", "失敗", "エラー", "bounced"]
+
+    def _parse_variables(line: str, email: str) -> dict:
+        """変数列を解析: '名前=...', '役職=...', 'メモ=...' を抽出"""
+        out = {"name": "", "title": "", "memo": ""}
+        # email より後ろの部分を変数候補とする
+        idx = line.find(email)
+        tail = line[idx + len(email):] if idx >= 0 else line
+        for m in re.finditer(r"(名前|お名前|氏名|name)\s*[=：:]\s*([^,\t\n、]+)", tail, re.IGNORECASE):
+            out["name"] = m.group(2).strip()
+            break
+        for m in re.finditer(r"(役職|役職名|肩書|title)\s*[=：:]\s*([^,\t\n、]+)", tail, re.IGNORECASE):
+            out["title"] = m.group(2).strip()
+            break
+        for m in re.finditer(r"(メモ|備考|note|memo)\s*[=：:]\s*([^,\t\n、]+)", tail, re.IGNORECASE):
+            out["memo"] = m.group(2).strip()
+            break
+        return out
+
+    pending_rows = []
+    counts = {"sent": 0, "unsubscribed": 0, "pending": 0, "unknown": 0, "failed": 0}
+    seen_emails = set()
+    for line in text.splitlines():
+        line_lower = " " + line.lower() + " "
+        emails_in_line = EMAIL_RE.findall(line)
+        for email in emails_in_line:
+            email = email.strip().lower()
+            if email in seen_emails:
+                continue
+            seen_emails.add(email)
+            if any(kw in line_lower for kw in UNSUB_KEYWORDS):
+                counts["unsubscribed"] += 1
+            elif any(kw in line_lower for kw in SENT_KEYWORDS):
+                counts["sent"] += 1
+            elif any(kw in line_lower for kw in FAILED_KEYWORDS):
+                counts["failed"] += 1
+            elif any(kw in line_lower for kw in PENDING_KEYWORDS):
+                counts["pending"] += 1
+                vars = _parse_variables(line, email)
+                pending_rows.append({"email": email, **vars})
+            else:
+                # ステータス未検出 → 未送信扱い（保守的: スキップしない）
+                counts["unknown"] += 1
+                vars = _parse_variables(line, email)
+                pending_rows.append({"email": email, **vars})
+
+    # CSV/TSV 生成
+    import csv as _csv
+    from io import StringIO
+    def _build(delim):
+        buf = StringIO()
+        w = _csv.writer(buf, delimiter=delim, lineterminator="\n")
+        w.writerow(["email", "name", "title", "memo"])
+        for r in pending_rows:
+            w.writerow([r["email"], r["name"], r["title"], r["memo"]])
+        return buf.getvalue()
+
+    return jsonify({
+        "pending": pending_rows,
+        "counts": counts,
+        "csv": _build(","),
+        "tsv": _build("\t"),
+        "total_pending": len(pending_rows),
+    })
+
+
+@app.route("/api/email/exclude/import", methods=["POST"])
+def email_exclude_import():
+    """外部ツール（Mail Sales GiveFast 等）の送信済み一覧を取込み、除外リストに登録。
+    入力: { text: "..." } - 各行に email と status('sent'/'unsubscribed'/'opened'/'失敗'等) を含むテキスト。
+    'sent'/'unsubscribed'/'opened' を含む行のメアドを email_sent_log に status='sent_external' で記録し、
+    次回送信時に自動スキップされるようにする。
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "テキストを貼り付けてください"}), 400
+
+    EXCLUDE_KEYWORDS = ["sent", "delivered", "送信済", "配信済", "opened", "open",
+                        "unsubscribed", "unsub", "配信停止", "拒否", "解除", "オプトアウト"]
+    PENDING_KEYWORDS = ["pending", "queued", "未送信", "待機", "draft"]
+
+    added = 0
+    skipped_pending = 0
+    detected_emails = 0
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for line in text.splitlines():
+            line_lower = line.lower()
+            emails_in_line = EMAIL_RE.findall(line)
+            if not emails_in_line:
+                continue
+            detected_emails += len(emails_in_line)
+            # 明示的に pending と分類されている行はスキップ（送信対象として残す）
+            is_pending = any(kw in line_lower for kw in PENDING_KEYWORDS) and not any(kw in line_lower for kw in EXCLUDE_KEYWORDS)
+            if is_pending:
+                skipped_pending += len(emails_in_line)
+                continue
+            # 除外キーワードを含む行 → 各メアドを sent_external として記録
+            if any(kw in line_lower for kw in EXCLUDE_KEYWORDS):
+                for email in emails_in_line:
+                    email = email.strip().lower()
+                    cur = conn.execute(
+                        "INSERT INTO email_sent_log (campaign_id, to_email, status, error_message, sent_at) "
+                        "VALUES (?,?,?,?,?)",
+                        (None, email, "sent_external", "imported from external tool", now),
+                    )
+                    if cur.rowcount > 0:
+                        added += 1
+        conn.commit()
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "added": added,
+            "kept_as_pending": skipped_pending,
+            "total_emails_detected": detected_emails,
+        })
+    except Exception as e:
+        app.logger.error(f"exclude import error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/email/exclude/count")
+def email_exclude_count():
+    """現在の送信済み履歴件数を返す"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        total = conn.execute("SELECT COUNT(DISTINCT to_email) FROM email_sent_log WHERE status IN ('sent','sent_external')").fetchone()[0]
+        external = conn.execute("SELECT COUNT(DISTINCT to_email) FROM email_sent_log WHERE status='sent_external'").fetchone()[0]
+        conn.close()
+        return jsonify({"total_unique_sent": total, "external_imported": external})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/email/exclude/clear", methods=["POST"])
+def email_exclude_clear():
+    """外部取込分のみクリア（自分のキャンペーンの送信履歴は残す）"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.execute("DELETE FROM email_sent_log WHERE status='sent_external'")
+        deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "deleted": deleted})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/email/preview", methods=["POST"])
+def email_preview():
+    """差込変数を適用したサンプルを返す"""
+    data = request.get_json(silent=True) or {}
+    subject = data.get("subject") or ""
+    body = data.get("body") or ""
+    recipients = _parse_recipients(data.get("recipients") or data.get("text") or "")
+    sample_row = recipients[0] if recipients else {"email": "sample@example.com"}
+    return jsonify({
+        "subject": _merge_template_vars(subject, sample_row),
+        "body": _merge_template_vars(body, sample_row),
+        "total_recipients": len(recipients),
+        "sample_row": sample_row,
+    })
+
+
+# ===== バウンス済みメール管理 API =====
+@app.route("/api/inquiry/bounced", methods=["GET"])
+def inquiry_bounced_list():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, email, domain, reason, created_at FROM inquiry_bounced_emails ORDER BY id DESC LIMIT 1000"
+    ).fetchall()
+    conn.close()
+    return jsonify({"items": [
+        {"id": r[0], "email": r[1], "domain": r[2], "reason": r[3], "created_at": r[4]} for r in rows
+    ]})
+
+
+@app.route("/api/inquiry/bounced", methods=["POST"])
+def inquiry_bounced_add():
+    """バウンス済みメールを登録（単一またはテキストから一括抽出）。
+    各ドメインを inquiry_blacklist にも自動追加（reason='bounce'）。"""
+    data = request.get_json(silent=True) or {}
+    reason = (data.get("reason") or "bounce").strip()[:200]
+    text = (data.get("text") or data.get("email") or "").strip()
+    emails = _extract_emails(text)
+    if not emails:
+        return jsonify({"error": "メールアドレスが見つかりませんでした"}), 400
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    added_emails = 0
+    added_domains = 0
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for email in emails:
+            domain = email.split("@", 1)[1] if "@" in email else ""
+            domain = domain.lower().lstrip("www.").lstrip(".")
+            # 個別メール記録
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO inquiry_bounced_emails (email, domain, reason, created_at) VALUES (?,?,?,?)",
+                (email, domain, reason, now),
+            )
+            if cur.rowcount > 0:
+                added_emails += 1
+            # ドメインを NG リストにも自動登録（既存があれば無視）
+            if domain:
+                cur2 = conn.execute(
+                    "INSERT OR IGNORE INTO inquiry_blacklist (domain, reason, created_at) VALUES (?,?,?)",
+                    (domain, f"bounce: {email}", now),
+                )
+                if cur2.rowcount > 0:
+                    added_domains += 1
+        conn.commit()
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "added_emails": added_emails,
+            "added_blacklist_domains": added_domains,
+            "total_input": len(emails),
+        })
+    except Exception as e:
+        app.logger.error(f"bounced add error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inquiry/bounced/<int:bid>", methods=["DELETE"])
+def inquiry_bounced_delete(bid: int):
+    """バウンス記録のみ削除（NGリスト側は手動管理に任せる）"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM inquiry_bounced_emails WHERE id=?", (bid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.errorhandler(429)

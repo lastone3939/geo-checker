@@ -146,6 +146,27 @@
     .tab-content { display: none; padding: 0 0 32px; }
     .tab-content.active { display: block; }
 
+    /* 問い合わせフォーム営業タブ用 */
+    .inq-input {
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px; background: #fff; font-family: inherit; width: 100%;
+      box-sizing: border-box;
+    }
+    .inq-input:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+    .inq-status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 700;
+    }
+    .inq-status-sent { background: #E6F4EA; color: #1E8E3E; }
+    .inq-status-preview { background: #E8F0FE; color: #1A73E8; }
+    .inq-status-no_form { background: #FEF7E0; color: #B06000; }
+    .inq-status-captcha { background: #FCE8E6; color: #C5221F; }
+    .inq-status-failed { background: #FCE8E6; color: #C5221F; }
+    .inq-status-skipped { background: #F1F3F4; color: #5F6368; }
+    .inq-status-skipped_blacklist { background: #F1F3F4; color: #5F6368; }
+    .inq-status-skipped_duplicate { background: #F1F3F4; color: #5F6368; }
+    .inq-status-sent_unknown { background: #E8F0FE; color: #1A73E8; }
+
     /* 入力フォーム */
     .form-wrap {
       display: flex; gap: 8px;
@@ -811,6 +832,8 @@
           <button class="tab-btn" data-tab="gbp">📍 GBP</button>
           <button class="tab-btn" data-tab="chat">💬 チャット</button>
           <button class="tab-btn" data-tab="video">🎬 動画</button>
+          <button class="tab-btn" data-tab="inquiry">📬 フォーム営業</button>
+          <button class="tab-btn" data-tab="email">✉️ メール送信</button>
         </div>
 
         <div id="tabWeb" class="tab-content active">
@@ -1103,6 +1126,380 @@
 
           </div>
         </div>
+
+        <div id="tabInquiry" class="tab-content">
+          <div style="padding-top:20px;">
+            <div style="text-align:center;margin-bottom:16px;">
+              <p style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;">
+                問い合わせフォーム営業を自動化
+              </p>
+              <p style="font-size:13px;color:var(--text-sub);">
+                対象企業のURLを貼り付けるだけ。フォームを自動検出・自動入力・一括送信。
+              </p>
+            </div>
+
+            <!-- ステップ1: 営業テンプレート -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">① 営業テンプレートを入力</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  お名前 <span style="color:#EA4335;">*</span>
+                  <input type="text" id="inqName" placeholder="清水 望" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  ふりがな
+                  <input type="text" id="inqKana" placeholder="しみず のぞむ" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  会社名
+                  <input type="text" id="inqCompany" placeholder="株式会社ZETTAI" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  部署/役職
+                  <input type="text" id="inqDepartment" placeholder="営業部" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  メールアドレス <span style="color:#EA4335;">*</span>
+                  <input type="email" id="inqEmail" placeholder="sales@zettai.co.jp" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  電話番号
+                  <input type="tel" id="inqPhone" placeholder="080-1234-5678" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  自社URL
+                  <input type="url" id="inqUrl" placeholder="https://zettai.co.jp" class="inq-input">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;">
+                  住所
+                  <input type="text" id="inqAddress" placeholder="東京都..." class="inq-input">
+                </label>
+              </div>
+              <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;margin-top:10px;">
+                件名
+                <input type="text" id="inqSubject" placeholder="AI検索対策（GEO）のご提案" class="inq-input">
+              </label>
+              <label style="display:flex;flex-direction:column;font-size:12px;color:var(--text-sub);gap:4px;margin-top:10px;">
+                本文 <span style="color:#EA4335;">*</span>
+                <textarea id="inqMessage" rows="6" class="inq-input" placeholder="突然のご連絡失礼いたします。株式会社ZETTAIの清水と申します。..."></textarea>
+              </label>
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                <button type="button" onclick="saveInquiryTemplate()" style="flex:1;min-width:110px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">💾 ローカル保存</button>
+                <button type="button" onclick="loadInquiryTemplate()" style="flex:1;min-width:110px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📥 ローカル読込</button>
+                <button type="button" onclick="openSavedTemplatesModal()" style="flex:1;min-width:110px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📋 保存済み一覧</button>
+                <button type="button" onclick="openAiMessageModal()" style="flex:1;min-width:120px;padding:10px;background:linear-gradient(135deg,#9D50BB,#6F42C1);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">✨ AIで文面生成</button>
+              </div>
+            </div>
+
+            <!-- ステップ2: 対象URL -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+                <p style="font-size:13px;font-weight:700;color:var(--text);margin:0;">② 送信先URLを貼り付け（1行に1つ / 最大200件）</p>
+                <label style="padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text-sub);">
+                  📂 CSVから読込
+                  <input type="file" id="inqCsvFile" accept=".csv,.txt" style="display:none;" onchange="loadInquiryUrlsCsv(event)">
+                </label>
+              </div>
+              <textarea id="inqUrls" rows="8" class="inq-input" placeholder="https://example.com&#10;https://example.co.jp&#10;https://another-site.jp"></textarea>
+              <div id="inqUrlCount" style="font-size:11px;color:var(--muted);margin-top:6px;">0 件</div>
+            </div>
+
+            <!-- ステップ3: 実行オプション -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">③ 実行オプション</p>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" id="inqDryRun" checked>
+                <span>プレビューのみ（ドライラン：実際には送信しない）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" id="inqSkipDup" checked>
+                <span>過去に送信成功したドメインは自動スキップ（重複送信防止）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+                <input type="checkbox" id="inqSkipBl" checked>
+                <span>NGドメイン（ブラックリスト・バウンス済み）を自動スキップ</span>
+              </label>
+              <div style="margin-bottom:10px;">
+                <button type="button" onclick="openBouncedModal()" style="padding:6px 12px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-sub);">📮 バウンスしたメールを登録</button>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex-wrap:wrap;">
+                送信レート
+                <span style="font-size:12px;color:var(--text-sub);">1分間に</span>
+                <input type="number" id="inqRate" value="5" min="1" max="60" step="1" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;" oninput="updateInquiryRateHint()">
+                <span style="font-size:12px;color:var(--text-sub);">通</span>
+                <span id="inqRateHint" style="font-size:11px;color:var(--muted);">（約12秒間隔・相手サイトへの負荷軽減）</span>
+              </label>
+            </div>
+
+            <button type="button" id="inqSubmitBtn" onclick="startInquiryCampaign()" class="submit-btn" style="width:100%;padding:14px;font-size:15px;">
+              🚀 一括実行スタート
+            </button>
+
+            <!-- 進捗表示 -->
+            <div id="inqProgressArea" style="display:none;margin-top:16px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div style="width:18px;height:18px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <span id="inqProgressText" style="font-size:14px;font-weight:600;">処理中...</span>
+                <button type="button" onclick="cancelInquiryCampaign()" id="inqCancelBtn" style="margin-left:auto;padding:4px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;">中止</button>
+              </div>
+              <div style="background:#E8EAED;border-radius:4px;height:6px;overflow:hidden;">
+                <div id="inqProgressBar" style="height:100%;background:var(--primary);border-radius:4px;width:0%;transition:width 0.3s ease;"></div>
+              </div>
+            </div>
+
+            <!-- 結果サマリー -->
+            <div id="inqSummary" style="display:none;margin-top:14px;padding:12px;background:#E8F0FE;border:1px solid #1A73E8;border-radius:10px;font-size:13px;color:#174EA6;"></div>
+            <div id="inqExportArea" style="display:none;margin-top:10px;">
+              <button type="button" id="inqExportBtn" style="padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">📥 結果をCSVでダウンロード</button>
+            </div>
+
+            <!-- 結果テーブル -->
+            <div id="inqResultWrap" style="display:none;margin-top:14px;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#F1F3F4;">
+                    <th style="text-align:left;padding:8px;border:1px solid var(--border);">URL</th>
+                    <th style="padding:8px;border:1px solid var(--border);width:110px;">ステータス</th>
+                    <th style="padding:8px;border:1px solid var(--border);width:80px;">詳細</th>
+                  </tr>
+                </thead>
+                <tbody id="inqResultBody"></tbody>
+              </table>
+            </div>
+
+            <p style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.6;">
+              ※ 相手サイトのrobots.txt/利用規約を尊重し、過度な連投は避けてください。本ツールはCAPTCHA設置フォームをスキップします。<br>
+              ※ 全キャンペーンの履歴・失敗再実行・CSV出力は <code>/inquiry/dashboard?token=ADMIN_TOKEN</code> から確認できます。
+            </p>
+          </div>
+        </div>
+
+        <div id="tabEmail" class="tab-content">
+          <div style="padding-top:20px;">
+            <div style="text-align:center;margin-bottom:16px;">
+              <p style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;">
+                メール一括送信（SMTP経由）
+              </p>
+              <p style="font-size:13px;color:var(--text-sub);">
+                メールアドレスリスト + 件名/本文を入力するだけ。差込変数（{{name}} 等）対応・重複制御切替可。
+              </p>
+            </div>
+
+            <!-- 差出人 -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">① 差出人情報</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);">
+                  差出人名（表示名）
+                  <input type="text" id="emFromName" class="inq-input" placeholder="清水 望（株式会社ZETTAI）">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);">
+                  差出人アドレス
+                  <input type="email" id="emFromEmail" class="inq-input" placeholder="（空欄なら環境変数のSMTP_FROMを使用）">
+                </label>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">
+                ※ 実際の送信は SMTP_FROM 環境変数で設定されたアカウントから行われます。<br>
+                ※ 一部メールサーバーは別ドメインからの送信を拒否するため、表示名のみカスタマイズ推奨。
+              </p>
+            </div>
+
+            <!-- 件名・本文 -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">② 件名・本文</p>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+                件名 <span style="color:#EA4335;">*</span>
+                <input type="text" id="emSubject" class="inq-input" placeholder="例: AI検索対策（GEO）のご提案">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);">
+                本文 <span style="color:#EA4335;">*</span>
+                <textarea id="emBody" rows="10" class="inq-input" placeholder="{{name}} 様&#10;&#10;突然のご連絡失礼いたします。株式会社ZETTAIの清水と申します。&#10;..."></textarea>
+              </label>
+              <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+                差込変数: <code>{{email}}</code> <code>{{name}}</code> <code>{{company}}</code> 等（CSVヘッダー列名と一致）
+              </p>
+              <button type="button" onclick="previewEmail()" style="margin-top:8px;padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">👁 1件目でプレビュー</button>
+            </div>
+
+            <!-- 未送信メアド抽出ツール -->
+            <div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:#1E7A3E;margin-bottom:8px;">🔍 未送信メアドだけ抽出（スプレッドシート用）</p>
+              <p style="font-size:12px;color:#5F6368;line-height:1.5;margin-bottom:10px;">
+                Mail Sales GiveFast の一覧を貼り付けると、<strong>sent / unsubscribed を除外して未送信(pending)のみのリスト</strong>を抽出します。<br>
+                スプレッドシート（Excel/Googleシート）に直接貼れるTSV形式で出力します。
+              </p>
+              <textarea id="emExtractText" rows="4" class="inq-input" placeholder="osada@sincere-audit.com   名前=長田 洋和   unsubscribed&#10;shinnosuke.go@e-tenki.co.jp   名前=郷 真之介   sent&#10;m.ikeda@blocks-office.jp   名前=池田 美月   pending&#10;a-kikuchi@apre-group.com   名前=Atsuyuki   pending&#10;...（表を丸ごと貼り付けOK）"></textarea>
+              <button type="button" onclick="extractPendingEmails()" style="margin-top:8px;padding:8px 16px;background:#34A853;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">🔍 未送信のみを抽出</button>
+
+              <div id="emExtractResult" style="display:none;margin-top:12px;">
+                <div id="emExtractCounts" style="font-size:13px;color:#1E7A3E;margin-bottom:8px;font-weight:600;"></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                  <button type="button" onclick="copyTsvToClipboard()" style="padding:8px 14px;background:#1A73E8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">📋 TSVをコピー（スプレッドシートに直接貼れます）</button>
+                  <button type="button" onclick="downloadPendingCsv()" style="padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-sub);">💾 CSVダウンロード</button>
+                  <button type="button" onclick="useAsRecipients()" style="padding:8px 14px;background:#FB8C00;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">↓ このまま下の送信先に設定</button>
+                </div>
+                <details style="font-size:12px;color:var(--text-sub);">
+                  <summary style="cursor:pointer;padding:4px 0;">プレビュー（先頭20件）</summary>
+                  <div id="emExtractPreview" style="max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;"></div>
+                </details>
+              </div>
+            </div>
+
+            <!-- 外部ツールの送信済みを除外リストに取込 -->
+            <div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:#B06000;margin-bottom:8px;">📋 外部ツールの送信済み一覧を取込（任意）</p>
+              <p style="font-size:12px;color:#5F6368;line-height:1.5;margin-bottom:10px;">
+                Mail Sales GiveFast 等の表（メアド + ステータス）を <strong>全選択コピー</strong>して貼り付けると、<br>
+                <code>sent</code> / <code>unsubscribed</code> を自動検出し、次回送信から除外します。<code>pending</code> はそのまま送信対象として残ります。
+              </p>
+              <textarea id="emExcludeText" rows="4" class="inq-input" placeholder="osada@sincere-audit.com   メモ=,名前=長田 洋和   unsubscribed&#10;shinnosuke.go@e-tenki.co.jp   名前=郷 真之介   sent&#10;m.ikeda@blocks-office.jp   名前=池田 美月   pending&#10;...（表を丸ごと貼り付けOK）"></textarea>
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                <button type="button" onclick="importEmailExcludeList()" style="padding:8px 14px;background:#FB8C00;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">取込（除外リストに追加）</button>
+                <button type="button" onclick="refreshExcludeCount()" style="padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-sub);">現在の除外件数を確認</button>
+                <button type="button" onclick="clearExternalSentLog()" style="padding:8px 14px;background:#fff;border:1px solid #EA4335;color:#EA4335;border-radius:8px;cursor:pointer;font-size:12px;">外部取込分のみクリア</button>
+              </div>
+              <div id="emExcludeStatus" style="font-size:12px;color:#5F6368;margin-top:8px;"></div>
+            </div>
+
+            <!-- 送信先 -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+                <p style="font-size:13px;font-weight:700;color:var(--text);margin:0;">③ 送信先（最大1000件）</p>
+                <label style="padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text-sub);">
+                  📂 CSV読込
+                  <input type="file" id="emCsvFile" accept=".csv,.txt" style="display:none;" onchange="loadEmailCsv(event)">
+                </label>
+              </div>
+              <textarea id="emRecipients" rows="8" class="inq-input" placeholder="email,name,company&#10;info@example.com,山田太郎,株式会社A&#10;contact@another.co.jp,鈴木花子,株式会社B&#10;&#10;または1行1メアド:&#10;info@example.com&#10;contact@another.co.jp&#10;&#10;※全792件まるごと貼り付ければOK。上で取込んだ送信済みは自動スキップ"></textarea>
+              <div id="emRecipientCount" style="font-size:11px;color:var(--muted);margin-top:6px;">0 件</div>
+            </div>
+
+            <!-- オプション -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">④ オプション</p>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" id="emAllowResend">
+                <span>過去送信済みのアドレスにも送る（重複防止をOFF）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+                <input type="checkbox" id="emSkipBounce" checked>
+                <span>バウンス済み/NGドメインを自動スキップ</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex-wrap:wrap;">
+                送信レート
+                <span style="font-size:12px;color:var(--text-sub);">1分間に</span>
+                <input type="number" id="emRate" value="5" min="1" max="60" step="1" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;" oninput="updateEmailRateHint()">
+                <span style="font-size:12px;color:var(--text-sub);">通</span>
+                <span id="emRateHint" style="font-size:11px;color:var(--muted);">（約12秒間隔）</span>
+              </label>
+            </div>
+
+            <button type="button" id="emSubmitBtn" onclick="startEmailCampaign()" class="submit-btn" style="width:100%;padding:14px;font-size:15px;">
+              ✉️ 一括送信スタート
+            </button>
+
+            <!-- 進捗 -->
+            <div id="emProgressArea" style="display:none;margin-top:16px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div style="width:18px;height:18px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <span id="emProgressText" style="font-size:14px;font-weight:600;">処理中...</span>
+                <button type="button" onclick="cancelEmailCampaign()" style="margin-left:auto;padding:4px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;">中止</button>
+              </div>
+              <div style="background:#E8EAED;border-radius:4px;height:6px;overflow:hidden;">
+                <div id="emProgressBar" style="height:100%;background:var(--primary);border-radius:4px;width:0%;transition:width 0.3s ease;"></div>
+              </div>
+            </div>
+
+            <!-- サマリー -->
+            <div id="emSummary" style="display:none;margin-top:14px;padding:12px;background:#E8F0FE;border:1px solid #1A73E8;border-radius:10px;font-size:13px;color:#174EA6;"></div>
+
+            <!-- 結果テーブル -->
+            <div id="emResultWrap" style="display:none;margin-top:14px;max-height:400px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#F1F3F4;position:sticky;top:0;">
+                    <th style="text-align:left;padding:8px;border:1px solid var(--border);">メールアドレス</th>
+                    <th style="padding:8px;border:1px solid var(--border);width:120px;">ステータス</th>
+                    <th style="padding:8px;border:1px solid var(--border);">エラー</th>
+                  </tr>
+                </thead>
+                <tbody id="emResultBody"></tbody>
+              </table>
+            </div>
+
+            <p style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.6;">
+              ※ 短時間に大量送信するとSMTPプロバイダ側でレート制限される可能性があります。<br>
+              ※ 同一アドレスへの再送はスパム判定リスクを高めます。件名・本文を変える等の工夫を推奨。<br>
+              ※ デフォルトでは過去送信成功アドレスを自動スキップします（再送する場合は④で「重複防止をOFF」をチェック）。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- バウンスメール登録モーダル -->
+    <div id="bouncedModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <p style="font-size:15px;font-weight:700;color:var(--primary);margin:0;">📮 バウンスしたメールを登録</p>
+          <button type="button" onclick="closeBouncedModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-sub);">×</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px;line-height:1.6;">
+          バウンスしたメールアドレスを貼り付けてください。改行・カンマ区切りいずれもOK。<br>
+          バウンス通知メールの本文をまるごと貼り付けても、アドレスを自動抽出します。<br>
+          <strong>登録すると、そのドメイン全体が次回以降の送信から自動スキップされます。</strong>
+        </p>
+        <textarea id="bouncedTextMain" rows="6" class="inq-input" placeholder="info@example.com&#10;contact@another.co.jp&#10;またはバウンス通知メールの本文を貼り付け"></textarea>
+        <input type="text" id="bouncedReasonMain" class="inq-input" placeholder="理由（任意）" style="margin-top:8px;">
+        <button type="button" id="bouncedSubmitBtn" onclick="submitBouncedFromTab()" class="submit-btn" style="width:100%;margin-top:10px;">登録 + NGリストに自動追加</button>
+        <div id="bouncedStatus" style="font-size:12px;color:var(--text-sub);margin-top:10px;text-align:center;"></div>
+      </div>
+    </div>
+
+    <!-- 保存済みテンプレート一覧モーダル -->
+    <div id="savedTplModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:#fff;border-radius:12px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <p style="font-size:15px;font-weight:700;color:var(--primary);margin:0;">📋 保存済みテンプレート</p>
+          <button type="button" onclick="closeSavedTemplatesModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-sub);">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <input id="newTplName" placeholder="テンプレート名（例: 飲食店向け）" class="inq-input">
+          <input id="newTplTag" placeholder="タグ（例: 飲食）" class="inq-input">
+        </div>
+        <button type="button" onclick="saveTemplateToServer()" class="submit-btn" style="width:100%;margin-bottom:14px;">現在の入力内容を保存</button>
+        <div id="savedTplList" style="font-size:13px;"></div>
+      </div>
+    </div>
+
+    <!-- AI文面生成モーダル -->
+    <div id="aiMessageModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:#fff;border-radius:12px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <p style="font-size:15px;font-weight:700;color:var(--primary);margin:0;">✨ AIで営業文面を生成</p>
+          <button type="button" onclick="closeAiMessageModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-sub);">×</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px;">Geminiで自社情報・提案サービスから件名と本文を自動生成します。</p>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+          提案するサービス（必須）
+          <textarea id="aiService" rows="3" class="inq-input" placeholder="例: AI検索（ChatGPT, Claude, Perplexity）にヒットしやすくする「GEO対策」のコンサル+実装サービス。月額3万円〜"></textarea>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+          送信先業種（任意）
+          <input type="text" id="aiIndustry" class="inq-input" placeholder="例: 飲食店, BtoB SaaS, 美容サロン">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);margin-bottom:14px;">
+          トーン
+          <select id="aiTone" class="inq-input">
+            <option>丁寧</option>
+            <option>親しみやすい</option>
+            <option>フォーマル</option>
+            <option>カジュアル</option>
+          </select>
+        </label>
+        <button type="button" id="aiGenBtn" onclick="generateAiMessage()" class="submit-btn" style="width:100%;">生成する</button>
+        <div id="aiGenStatus" style="display:none;font-size:12px;color:var(--text-sub);margin-top:10px;text-align:center;"></div>
       </div>
     </div>
 
@@ -1609,7 +2006,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
   if (btn) btn.classList.add('active');
-  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo' };
+  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo', inquiry: 'tabInquiry', email: 'tabEmail' };
   const tabEl = document.getElementById(tabIds[tab] || 'tabWeb');
   if (tabEl) tabEl.classList.add('active');
 
@@ -2547,6 +2944,706 @@ async function sendChatMessageText(msg) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// ===== 問い合わせフォーム営業 自動化 =====
+const INQUIRY_TEMPLATE_KEY = 'zettai_inquiry_template_v1';
+let inquiryJobId = null;
+let inquiryPollTimer = null;
+
+function collectInquiryTemplate() {
+  return {
+    name: (document.getElementById('inqName').value || '').trim(),
+    kana: (document.getElementById('inqKana').value || '').trim(),
+    company: (document.getElementById('inqCompany').value || '').trim(),
+    department: (document.getElementById('inqDepartment').value || '').trim(),
+    email: (document.getElementById('inqEmail').value || '').trim(),
+    phone: (document.getElementById('inqPhone').value || '').trim(),
+    url: (document.getElementById('inqUrl').value || '').trim(),
+    address: (document.getElementById('inqAddress').value || '').trim(),
+    subject: (document.getElementById('inqSubject').value || '').trim(),
+    message: (document.getElementById('inqMessage').value || '').trim(),
+  };
+}
+
+function saveInquiryTemplate() {
+  try {
+    localStorage.setItem(INQUIRY_TEMPLATE_KEY, JSON.stringify(collectInquiryTemplate()));
+    alert('テンプレートを保存しました');
+  } catch (e) {
+    alert('保存に失敗しました: ' + e.message);
+  }
+}
+
+function loadInquiryTemplate() {
+  try {
+    const raw = localStorage.getItem(INQUIRY_TEMPLATE_KEY);
+    if (!raw) { alert('保存されたテンプレートがありません'); return; }
+    const t = JSON.parse(raw);
+    const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+    setV('inqName', t.name); setV('inqKana', t.kana); setV('inqCompany', t.company);
+    setV('inqDepartment', t.department); setV('inqEmail', t.email); setV('inqPhone', t.phone);
+    setV('inqUrl', t.url); setV('inqAddress', t.address); setV('inqSubject', t.subject);
+    setV('inqMessage', t.message);
+  } catch (e) { alert('読込に失敗しました: ' + e.message); }
+}
+
+function parseInquiryUrls() {
+  const raw = document.getElementById('inqUrls').value || '';
+  return raw.split(/[\r\n,、\s]+/).map(s => s.trim()).filter(Boolean);
+}
+
+function updateInquiryUrlCount() {
+  const urls = parseInquiryUrls();
+  const el = document.getElementById('inqUrlCount');
+  if (el) el.textContent = urls.length + ' 件';
+}
+
+function updateInquiryRateHint() {
+  const rateEl = document.getElementById('inqRate');
+  const hintEl = document.getElementById('inqRateHint');
+  if (!rateEl || !hintEl) return;
+  let r = parseFloat(rateEl.value);
+  if (!isFinite(r) || r < 1) r = 1;
+  if (r > 60) r = 60;
+  const interval = (60 / r).toFixed(1).replace(/\.0$/, '');
+  hintEl.textContent = `（約${interval}秒間隔・相手サイトへの負荷軽減）`;
+}
+
+let inquiryLatestResults = [];
+function renderInquiryResults(results) {
+  inquiryLatestResults = results;
+  const body = document.getElementById('inqResultBody');
+  const wrap = document.getElementById('inqResultWrap');
+  if (!body || !wrap) return;
+  if (!results.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const labelMap = {
+    sent: '✅ 送信完了', sent_unknown: '🔵 送信OK?', preview: '👁 プレビュー',
+    no_form: '⚠️ フォーム無し', captcha: '🛡 CAPTCHA',
+    skipped: '⏭ スキップ', skipped_blacklist: '🚫 NGドメイン', skipped_duplicate: '🔁 送信済み',
+    failed: '❌ 失敗',
+  };
+  body.innerHTML = results.map((r, idx) => {
+    const cls = 'inq-status-' + (r.status || 'failed');
+    const label = labelMap[r.status] || r.status;
+    const err = r.error ? `<div style="color:#C5221F;font-size:11px;margin-top:4px;">${escapeHtml(r.error)}</div>` : '';
+    const formUrl = r.form_url ? `<div style="color:#5F6368;font-size:11px;margin-top:2px;">form: ${escapeHtml(r.form_url)}</div>` : '';
+    return `
+      <tr>
+        <td style="padding:8px;border:1px solid var(--border);word-break:break-all;">
+          <a href="${escapeHtml(r.target_url)}" target="_blank" rel="noopener" style="color:#1A73E8;text-decoration:none;">${escapeHtml(r.target_url)}</a>
+          ${formUrl}${err}
+        </td>
+        <td style="padding:8px;border:1px solid var(--border);text-align:center;"><span class="inq-status-badge ${cls}">${label}</span></td>
+        <td style="padding:8px;border:1px solid var(--border);text-align:center;">
+          <button type="button" onclick="showInquiryDetail(${idx})" style="padding:4px 8px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;">詳細</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function showInquiryDetail(idx) {
+  const r = inquiryLatestResults[idx];
+  if (!r) return;
+  const lines = [];
+  lines.push('対象URL: ' + r.target_url);
+  if (r.form_url) lines.push('フォームURL: ' + r.form_url);
+  lines.push('ステータス: ' + r.status);
+  if (r.http_status) lines.push('HTTP: ' + r.http_status);
+  if (r.error) lines.push('エラー: ' + r.error);
+  if (r.detected_fields && r.detected_fields.length) {
+    lines.push('\n検出フィールド:');
+    r.detected_fields.forEach(f => lines.push(`  - ${f.name} [${f.category}] ${f.filled ? '✓' : '×'}`));
+  }
+  if (r.submission_data) {
+    lines.push('\n送信データ:');
+    Object.entries(r.submission_data).forEach(([k, v]) => {
+      const val = typeof v === 'string' && v.length > 80 ? v.slice(0, 80) + '…' : v;
+      lines.push(`  ${k} = ${val}`);
+    });
+  }
+  alert(lines.join('\n'));
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+async function startInquiryCampaign() {
+  const template = collectInquiryTemplate();
+  const urls = parseInquiryUrls();
+  const dryRun = document.getElementById('inqDryRun').checked;
+  const rateEl = document.getElementById('inqRate');
+  let ratePerMinute = parseFloat(rateEl ? rateEl.value : '5');
+  if (!isFinite(ratePerMinute) || ratePerMinute < 1) ratePerMinute = 5;
+  if (ratePerMinute > 60) ratePerMinute = 60;
+
+  if (!urls.length) { alert('対象URLを1件以上入力してください'); return; }
+  if (!dryRun) {
+    const missing = [];
+    if (!template.name) missing.push('お名前');
+    if (!template.email) missing.push('メールアドレス');
+    if (!template.message) missing.push('本文');
+    if (missing.length) { alert('本番送信には次の項目が必須です: ' + missing.join(', ')); return; }
+    if (!confirm(`${urls.length} 件のフォームに実際に送信します。よろしいですか？`)) return;
+  }
+
+  const btn = document.getElementById('inqSubmitBtn');
+  btn.disabled = true;
+  document.getElementById('inqProgressArea').style.display = 'block';
+  document.getElementById('inqProgressText').textContent = '送信開始中...';
+  document.getElementById('inqProgressBar').style.width = '0%';
+  document.getElementById('inqSummary').style.display = 'none';
+  document.getElementById('inqResultBody').innerHTML = '';
+  document.getElementById('inqResultWrap').style.display = 'none';
+
+  try {
+    const skipDup = document.getElementById('inqSkipDup') ? document.getElementById('inqSkipDup').checked : true;
+    const skipBl = document.getElementById('inqSkipBl') ? document.getElementById('inqSkipBl').checked : true;
+    const resp = await fetch('/api/inquiry/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        template, urls,
+        dry_run: dryRun, rate_per_minute: ratePerMinute,
+        skip_duplicates: skipDup, skip_blacklist: skipBl,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { throw new Error(data.error || '開始に失敗しました'); }
+    inquiryJobId = data.job_id;
+    pollInquiryStatus();
+  } catch (e) {
+    alert('エラー: ' + e.message);
+    btn.disabled = false;
+    document.getElementById('inqProgressArea').style.display = 'none';
+  }
+}
+
+async function pollInquiryStatus() {
+  if (!inquiryJobId) return;
+  try {
+    const resp = await fetch('/api/inquiry/status/' + inquiryJobId);
+    const data = await resp.json();
+    if (!resp.ok) { throw new Error(data.error || 'ステータス取得失敗'); }
+    const pct = data.total > 0 ? Math.round((data.progress / data.total) * 100) : 0;
+    document.getElementById('inqProgressBar').style.width = pct + '%';
+    document.getElementById('inqProgressText').textContent =
+      `処理中... ${data.progress} / ${data.total} 件 (${pct}%)`;
+    renderInquiryResults(data.results || []);
+
+    if (data.status === 'done' || data.status === 'error') {
+      clearTimeout(inquiryPollTimer);
+      document.getElementById('inqSubmitBtn').disabled = false;
+      document.getElementById('inqProgressArea').style.display = 'none';
+      const results = data.results || [];
+      const counts = {};
+      results.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+      const parts = Object.entries(counts).map(([k, v]) => `${k}: ${v}`);
+      const sum = document.getElementById('inqSummary');
+      sum.style.display = 'block';
+      sum.innerHTML = `✨ 処理完了（合計 ${results.length} 件）— ${parts.join(' / ')}`;
+      // CSV出力ボタンを表示
+      const exp = document.getElementById('inqExportArea');
+      const expBtn = document.getElementById('inqExportBtn');
+      if (exp && expBtn && inquiryJobId) {
+        const jid = inquiryJobId;
+        exp.style.display = 'block';
+        expBtn.onclick = function() { window.location.href = '/api/inquiry/export/' + jid; };
+      }
+      inquiryJobId = null;
+    } else {
+      inquiryPollTimer = setTimeout(pollInquiryStatus, 2000);
+    }
+  } catch (e) {
+    document.getElementById('inqProgressText').textContent = 'エラー: ' + e.message;
+    document.getElementById('inqSubmitBtn').disabled = false;
+  }
+}
+
+async function cancelInquiryCampaign() {
+  if (!inquiryJobId) return;
+  if (!confirm('このキャンペーンを中止しますか？')) return;
+  try {
+    await fetch('/api/inquiry/cancel/' + inquiryJobId, { method: 'POST' });
+  } catch (e) {}
+}
+
+// CSV読込: 1列目またはURLパターンを含む列をURLとして抽出
+function loadInquiryUrlsCsv(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = String(e.target.result || '');
+    const urls = [];
+    text.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const cols = trimmed.split(/[,\t]/);
+      for (const col of cols) {
+        const v = col.replace(/^"|"$/g, '').trim();
+        if (/^https?:\/\//i.test(v) || /^[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(v)) {
+          urls.push(v);
+          break;
+        }
+      }
+    });
+    if (!urls.length) { alert('CSVからURLを検出できませんでした'); return; }
+    const ta = document.getElementById('inqUrls');
+    const existing = (ta.value || '').trim();
+    ta.value = (existing ? existing + '\n' : '') + urls.join('\n');
+    updateInquiryUrlCount();
+    alert(urls.length + ' 件のURLを読み込みました');
+    event.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ===== メール一括送信 =====
+let emailJobId = null;
+let emailPollTimer = null;
+
+function parseEmailRecipients() {
+  return (document.getElementById('emRecipients').value || '').trim();
+}
+function countEmailRecipientsRoughly() {
+  const text = parseEmailRecipients();
+  const matches = text.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g);
+  return matches ? new Set(matches.map(s => s.toLowerCase())).size : 0;
+}
+function updateEmailRecipientCount() {
+  const el = document.getElementById('emRecipientCount');
+  if (el) el.textContent = countEmailRecipientsRoughly() + ' 件（メアド検出数）';
+}
+function updateEmailRateHint() {
+  const rateEl = document.getElementById('emRate');
+  const hintEl = document.getElementById('emRateHint');
+  if (!rateEl || !hintEl) return;
+  let r = parseFloat(rateEl.value);
+  if (!isFinite(r) || r < 1) r = 1;
+  if (r > 60) r = 60;
+  const interval = (60 / r).toFixed(1).replace(/\.0$/, '');
+  hintEl.textContent = `（約${interval}秒間隔）`;
+}
+
+function loadEmailCsv(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const ta = document.getElementById('emRecipients');
+    const existing = (ta.value || '').trim();
+    const newText = String(e.target.result || '');
+    ta.value = existing ? (existing + '\n' + newText) : newText;
+    updateEmailRecipientCount();
+    event.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function previewEmail() {
+  const subject = (document.getElementById('emSubject').value || '').trim();
+  const body = (document.getElementById('emBody').value || '').trim();
+  const text = parseEmailRecipients();
+  if (!subject && !body) { alert('件名・本文を入力してください'); return; }
+  try {
+    const r = await fetch('/api/email/preview', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({subject, body, text}),
+    });
+    const j = await r.json();
+    const sample = j.sample_row || {};
+    const sampleLines = Object.entries(sample).map(([k,v]) => `  ${k} = ${v}`).join('\n');
+    alert(
+      '【プレビュー（1件目のデータで差込）】\n' +
+      '宛先: ' + (sample.email || '(なし)') + '\n' +
+      '差込データ:\n' + sampleLines + '\n' +
+      '─────────\n' +
+      '件名: ' + j.subject + '\n\n' +
+      j.body + '\n\n' +
+      '─────────\n' +
+      '対象件数: ' + j.total_recipients + ' 件'
+    );
+  } catch (e) { alert('プレビュー失敗: ' + e.message); }
+}
+
+async function startEmailCampaign() {
+  const subject = (document.getElementById('emSubject').value || '').trim();
+  const body = (document.getElementById('emBody').value || '').trim();
+  const text = parseEmailRecipients();
+  const fromName = (document.getElementById('emFromName').value || '').trim();
+  const fromEmail = (document.getElementById('emFromEmail').value || '').trim();
+  let rate = parseFloat(document.getElementById('emRate').value || '5');
+  if (!isFinite(rate) || rate < 1) rate = 5;
+  if (rate > 60) rate = 60;
+  const allowResend = document.getElementById('emAllowResend').checked;
+  const skipBounce = document.getElementById('emSkipBounce').checked;
+  if (!subject) { alert('件名を入力してください'); return; }
+  if (!body) { alert('本文を入力してください'); return; }
+  const count = countEmailRecipientsRoughly();
+  if (!count) { alert('送信先メールアドレスを入力してください'); return; }
+  if (!confirm(`${count} 件のメールを実際に送信します（${rate} 通/分）。よろしいですか？`)) return;
+  if (allowResend && !confirm('「重複防止OFF」が有効です。過去送信成功したアドレスにも再送されます。本当に進めますか？')) return;
+
+  const btn = document.getElementById('emSubmitBtn');
+  btn.disabled = true;
+  document.getElementById('emProgressArea').style.display = 'block';
+  document.getElementById('emProgressText').textContent = '送信開始中...';
+  document.getElementById('emProgressBar').style.width = '0%';
+  document.getElementById('emSummary').style.display = 'none';
+  document.getElementById('emResultBody').innerHTML = '';
+  document.getElementById('emResultWrap').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/email/send', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        subject, body, text,
+        from_name: fromName, from_email: fromEmail,
+        rate_per_minute: rate,
+        allow_resend: allowResend, skip_bounce: skipBounce,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '開始に失敗');
+    emailJobId = data.job_id;
+    pollEmailStatus();
+  } catch (e) {
+    alert('エラー: ' + e.message);
+    btn.disabled = false;
+    document.getElementById('emProgressArea').style.display = 'none';
+  }
+}
+
+async function pollEmailStatus() {
+  if (!emailJobId) return;
+  try {
+    const r = await fetch('/api/email/status/' + emailJobId);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'ステータス取得失敗');
+    const pct = data.total > 0 ? Math.round((data.progress / data.total) * 100) : 0;
+    document.getElementById('emProgressBar').style.width = pct + '%';
+    document.getElementById('emProgressText').textContent = `処理中... ${data.progress} / ${data.total} 件 (${pct}%)`;
+    renderEmailResults(data.results || []);
+    if (data.status === 'done' || data.status === 'error') {
+      clearTimeout(emailPollTimer);
+      document.getElementById('emSubmitBtn').disabled = false;
+      document.getElementById('emProgressArea').style.display = 'none';
+      const results = data.results || [];
+      const counts = {};
+      results.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+      const parts = Object.entries(counts).map(([k,v]) => `${k}: ${v}`);
+      const sum = document.getElementById('emSummary');
+      sum.style.display = 'block';
+      sum.innerHTML = `✨ 処理完了（合計 ${data.total} 件処理）— ${parts.join(' / ')}`;
+      emailJobId = null;
+    } else {
+      emailPollTimer = setTimeout(pollEmailStatus, 2000);
+    }
+  } catch (e) {
+    document.getElementById('emProgressText').textContent = 'エラー: ' + e.message;
+    document.getElementById('emSubmitBtn').disabled = false;
+  }
+}
+
+function renderEmailResults(results) {
+  const body = document.getElementById('emResultBody');
+  const wrap = document.getElementById('emResultWrap');
+  if (!body || !wrap) return;
+  if (!results.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const labelMap = {
+    sent: '✅ 送信', failed: '❌ 失敗',
+    skipped_duplicate: '🔁 既送信', skipped_blacklist: '🚫 NG', skipped_bounce: '📮 バウンス済',
+  };
+  const colorMap = {
+    sent: '#34A853', failed: '#EA4335',
+    skipped_duplicate: '#5F6368', skipped_blacklist: '#5F6368', skipped_bounce: '#B06000',
+  };
+  body.innerHTML = results.map(r => {
+    const label = labelMap[r.status] || r.status;
+    const color = colorMap[r.status] || '#5F6368';
+    return `<tr>
+      <td style="padding:6px;border:1px solid var(--border);word-break:break-all;">${escapeHtml(r.email)}</td>
+      <td style="padding:6px;border:1px solid var(--border);text-align:center;color:${color};font-weight:700;">${label}</td>
+      <td style="padding:6px;border:1px solid var(--border);color:#C5221F;font-size:11px;">${escapeHtml(r.error || '')}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function cancelEmailCampaign() {
+  if (!emailJobId) return;
+  if (!confirm('このメールキャンペーンを中止しますか？')) return;
+  try { await fetch('/api/email/cancel/' + emailJobId, {method:'POST'}); } catch (e) {}
+}
+
+let lastExtractedTsv = '';
+let lastExtractedCsv = '';
+let lastExtractedRows = [];
+
+async function extractPendingEmails() {
+  const text = (document.getElementById('emExtractText').value || '').trim();
+  if (!text) { alert('Mail Sales GiveFast の一覧を貼り付けてください'); return; }
+  try {
+    const r = await fetch('/api/email/extract-pending', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    lastExtractedTsv = j.tsv || '';
+    lastExtractedCsv = j.csv || '';
+    lastExtractedRows = j.pending || [];
+    const c = j.counts || {};
+    document.getElementById('emExtractResult').style.display = 'block';
+    document.getElementById('emExtractCounts').innerHTML =
+      `✅ 抽出完了: <strong style="font-size:18px;">${j.total_pending}</strong> 件の未送信メアドを取り出しました ` +
+      `<span style="font-size:11px;color:#5F6368;">（内訳: sent=${c.sent||0} / unsubscribed=${c.unsubscribed||0} / pending=${c.pending||0} / unknown=${c.unknown||0} / failed=${c.failed||0}）</span>`;
+    const preview = lastExtractedRows.slice(0, 20).map(r =>
+      `${r.email}\t${r.name || ''}\t${r.title || ''}\t${r.memo || ''}`
+    ).join('\n');
+    document.getElementById('emExtractPreview').textContent =
+      'email\tname\ttitle\tmemo\n' + preview +
+      (lastExtractedRows.length > 20 ? `\n... 他 ${lastExtractedRows.length - 20} 件` : '');
+  } catch (e) { alert('抽出失敗: ' + e.message); }
+}
+
+async function copyTsvToClipboard() {
+  if (!lastExtractedTsv) { alert('先に抽出を実行してください'); return; }
+  try {
+    await navigator.clipboard.writeText(lastExtractedTsv);
+    alert(`✅ ${lastExtractedRows.length} 件をクリップボードにコピーしました。\nGoogleスプレッドシート/Excelで Cmd+V (Ctrl+V) で貼り付けてください。`);
+  } catch (e) {
+    // フォールバック: テキストエリアから手動コピー
+    const ta = document.createElement('textarea');
+    ta.value = lastExtractedTsv;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert(`✅ ${lastExtractedRows.length} 件をクリップボードにコピー（フォールバック方式）。`);
+  }
+}
+
+function downloadPendingCsv() {
+  if (!lastExtractedCsv) { alert('先に抽出を実行してください'); return; }
+  // UTF-8 BOM付き（Excel互換）
+  const bom = '﻿';
+  const blob = new Blob([bom + lastExtractedCsv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pending_emails_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function useAsRecipients() {
+  if (!lastExtractedRows.length) { alert('先に抽出を実行してください'); return; }
+  const target = document.getElementById('emRecipients');
+  // ヘッダー付きCSVとして設定
+  target.value = lastExtractedCsv;
+  updateEmailRecipientCount();
+  target.scrollIntoView({behavior: 'smooth', block: 'center'});
+  alert(`✅ ${lastExtractedRows.length} 件を「送信先」に設定しました。件名・本文を入力して送信スタートしてください。`);
+}
+
+async function importEmailExcludeList() {
+  const text = (document.getElementById('emExcludeText').value || '').trim();
+  const status = document.getElementById('emExcludeStatus');
+  if (!text) { alert('外部ツールの送信済み一覧を貼り付けてください'); return; }
+  status.style.color = '#5F6368';
+  status.textContent = '取込中...';
+  try {
+    const r = await fetch('/api/email/exclude/import', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#34A853';
+    status.textContent = `✅ 除外リストに ${j.added} 件追加 / pendingは ${j.kept_as_pending} 件保留（検出メアド合計 ${j.total_emails_detected} 件）`;
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
+}
+
+async function refreshExcludeCount() {
+  const status = document.getElementById('emExcludeStatus');
+  try {
+    const r = await fetch('/api/email/exclude/count');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#1A73E8';
+    status.textContent = `現在の除外件数: 合計 ${j.total_unique_sent} 件（うち外部取込 ${j.external_imported} 件）`;
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
+}
+
+async function clearExternalSentLog() {
+  if (!confirm('外部ツールから取込んだ送信履歴のみをクリアします。\n（このツールから送信したキャンペーンの履歴は残ります）\nよろしいですか？')) return;
+  const status = document.getElementById('emExcludeStatus');
+  try {
+    const r = await fetch('/api/email/exclude/clear', {method:'POST'});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#5F6368';
+    status.textContent = `🗑 ${j.deleted} 件の外部取込分をクリアしました`;
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
+}
+
+// バウンスメール登録
+function openBouncedModal() {
+  document.getElementById('bouncedModal').style.display = 'flex';
+  document.getElementById('bouncedStatus').textContent = '';
+}
+function closeBouncedModal() {
+  document.getElementById('bouncedModal').style.display = 'none';
+}
+async function submitBouncedFromTab() {
+  const text = (document.getElementById('bouncedTextMain').value || '').trim();
+  const reason = (document.getElementById('bouncedReasonMain').value || '').trim();
+  const status = document.getElementById('bouncedStatus');
+  const btn = document.getElementById('bouncedSubmitBtn');
+  if (!text) { alert('バウンスしたメールアドレスを貼り付けてください'); return; }
+  btn.disabled = true;
+  status.textContent = '登録中...';
+  try {
+    const r = await fetch('/api/inquiry/bounced', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text: text, reason: reason || 'bounce'}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unknown');
+    status.style.color = '#34A853';
+    status.textContent = `✅ ${j.added_emails} 件のメールを記録 / NGドメインに ${j.added_blacklist_domains} 件追加（入力 ${j.total_input} 件）`;
+    document.getElementById('bouncedTextMain').value = '';
+    document.getElementById('bouncedReasonMain').value = '';
+  } catch (e) {
+    status.style.color = '#EA4335';
+    status.textContent = 'エラー: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+// 保存済みテンプレート（サーバー側）
+async function openSavedTemplatesModal() {
+  document.getElementById('savedTplModal').style.display = 'flex';
+  await refreshSavedTemplates();
+}
+function closeSavedTemplatesModal() {
+  document.getElementById('savedTplModal').style.display = 'none';
+}
+async function refreshSavedTemplates() {
+  const wrap = document.getElementById('savedTplList');
+  wrap.innerHTML = '<div style="color:var(--text-sub);text-align:center;padding:10px;">読込中...</div>';
+  try {
+    const r = await fetch('/api/inquiry/templates');
+    const j = await r.json();
+    const items = j.items || [];
+    if (!items.length) { wrap.innerHTML = '<div style="color:var(--text-sub);text-align:center;padding:10px;">保存済みテンプレートはありません</div>'; return; }
+    wrap.innerHTML = items.map(it => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;">${escapeHtml(it.name)}${it.tag ? ' <span style="background:#E8F0FE;color:#1A73E8;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px;">' + escapeHtml(it.tag) + '</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--text-sub);">${escapeHtml(it.updated_at)} - 件名: ${escapeHtml((it.template.subject || '').slice(0, 30))}</div>
+        </div>
+        <button onclick="applySavedTemplate(${it.id})" style="padding:6px 10px;background:#1A73E8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">適用</button>
+        <button onclick="deleteSavedTemplate(${it.id})" style="padding:6px 10px;background:#fff;color:#EA4335;border:1px solid #EA4335;border-radius:6px;cursor:pointer;font-size:12px;">削除</button>
+      </div>
+    `).join('');
+    window._savedTpls = items;
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:#EA4335;">読込エラー: ' + e.message + '</div>';
+  }
+}
+async function saveTemplateToServer() {
+  const name = (document.getElementById('newTplName').value || '').trim();
+  const tag = (document.getElementById('newTplTag').value || '').trim();
+  if (!name) { alert('テンプレート名を入力してください'); return; }
+  try {
+    const r = await fetch('/api/inquiry/templates', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, tag, template: collectInquiryTemplate()}),
+    });
+    const j = await r.json();
+    if (!r.ok) { alert('エラー: ' + j.error); return; }
+    document.getElementById('newTplName').value = '';
+    document.getElementById('newTplTag').value = '';
+    await refreshSavedTemplates();
+  } catch (e) { alert('エラー: ' + e.message); }
+}
+function applySavedTemplate(tid) {
+  const tpl = (window._savedTpls || []).find(t => t.id === tid);
+  if (!tpl) return;
+  const t = tpl.template || {};
+  const setV = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  setV('inqName', t.name); setV('inqKana', t.kana); setV('inqCompany', t.company);
+  setV('inqDepartment', t.department); setV('inqEmail', t.email); setV('inqPhone', t.phone);
+  setV('inqUrl', t.url); setV('inqAddress', t.address); setV('inqSubject', t.subject);
+  setV('inqMessage', t.message);
+  closeSavedTemplatesModal();
+}
+async function deleteSavedTemplate(tid) {
+  if (!confirm('このテンプレートを削除しますか？')) return;
+  try {
+    const r = await fetch('/api/inquiry/templates/' + tid, {method:'DELETE'});
+    if (!r.ok) { alert('削除に失敗'); return; }
+    await refreshSavedTemplates();
+  } catch (e) { alert('エラー: ' + e.message); }
+}
+
+// AI文面生成
+function openAiMessageModal() {
+  document.getElementById('aiMessageModal').style.display = 'flex';
+}
+function closeAiMessageModal() {
+  document.getElementById('aiMessageModal').style.display = 'none';
+}
+async function generateAiMessage() {
+  const service = (document.getElementById('aiService').value || '').trim();
+  if (!service) { alert('提案するサービス内容を入力してください'); return; }
+  const btn = document.getElementById('aiGenBtn');
+  const status = document.getElementById('aiGenStatus');
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.textContent = '生成中... (10〜20秒程度)';
+  try {
+    const resp = await fetch('/api/inquiry/generate-message', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        sender_name: (document.getElementById('inqName').value || '').trim(),
+        sender_company: (document.getElementById('inqCompany').value || '').trim(),
+        service: service,
+        target_industry: (document.getElementById('aiIndustry').value || '').trim(),
+        tone: (document.getElementById('aiTone').value || '丁寧').trim(),
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '生成に失敗しました');
+    if (data.subject) document.getElementById('inqSubject').value = data.subject;
+    if (data.message) document.getElementById('inqMessage').value = data.message;
+    closeAiMessageModal();
+  } catch (e) {
+    status.textContent = 'エラー: ' + e.message;
+    btn.disabled = false;
+    return;
+  }
+  btn.disabled = false;
+  status.style.display = 'none';
+}
+
 // タブボタンにクリックイベントを設定（タッチ対応）
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -2563,6 +3660,24 @@ document.addEventListener('DOMContentLoaded', function() {
       if (tab) switchTab(tab);
     });
   });
+  // 問い合わせフォーム営業タブの初期化
+  const urlsBox = document.getElementById('inqUrls');
+  if (urlsBox) {
+    urlsBox.addEventListener('input', updateInquiryUrlCount);
+    updateInquiryUrlCount();
+  }
+  updateInquiryRateHint();
+  // メール送信タブの初期化
+  const emBox = document.getElementById('emRecipients');
+  if (emBox) {
+    emBox.addEventListener('input', updateEmailRecipientCount);
+    updateEmailRecipientCount();
+  }
+  updateEmailRateHint();
+  // 前回保存したテンプレートがあれば自動復元
+  try {
+    if (localStorage.getItem(INQUIRY_TEMPLATE_KEY)) loadInquiryTemplate();
+  } catch (e) {}
   console.log('Tab listeners initialized');
 });
 
