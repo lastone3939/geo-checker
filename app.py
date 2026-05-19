@@ -2889,10 +2889,20 @@ def inquiry_send():
     dry_run = bool(data.get("dry_run", True))
     skip_duplicates = bool(data.get("skip_duplicates", True))
     skip_blacklist = bool(data.get("skip_blacklist", True))
-    try:
-        delay = float(data.get("delay_seconds", 3.0))
-    except Exception:
-        delay = 3.0
+    # 送信レート: rate_per_minute（1分あたりN通）優先、互換でdelay_secondsも受付
+    rate_per_minute = data.get("rate_per_minute")
+    if rate_per_minute is not None:
+        try:
+            rate = float(rate_per_minute)
+        except Exception:
+            rate = 5.0
+        rate = max(1.0, min(rate, 60.0))
+        delay = 60.0 / rate
+    else:
+        try:
+            delay = float(data.get("delay_seconds", 12.0))
+        except Exception:
+            delay = 12.0
     delay = max(0.0, min(delay, 60.0))
 
     # 本番送信には最低限 name/email/message が必要
@@ -3026,7 +3036,7 @@ def inquiry_retry(campaign_id: int):
         ip = get_remote_address()
         threading.Thread(
             target=run_inquiry_job,
-            args=(job_id, urls, template, dry_run, 5.0, ip, True, True),
+            args=(job_id, urls, template, dry_run, 12.0, ip, True, True),  # 1分5通
             daemon=True,
         ).start()
         return jsonify({"job_id": job_id, "total": len(urls), "dry_run": dry_run})

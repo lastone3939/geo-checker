@@ -1218,10 +1218,12 @@
                 <input type="checkbox" id="inqSkipBl" checked>
                 <span>NGドメイン（ブラックリスト）を自動スキップ</span>
               </label>
-              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);">
-                送信間隔
-                <input type="number" id="inqDelay" value="5" min="0" max="60" step="1" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
-                <span style="font-size:12px;color:var(--text-sub);">秒（相手サイトへの負荷軽減）</span>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex-wrap:wrap;">
+                送信レート
+                <span style="font-size:12px;color:var(--text-sub);">1分間に</span>
+                <input type="number" id="inqRate" value="5" min="1" max="60" step="1" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;" oninput="updateInquiryRateHint()">
+                <span style="font-size:12px;color:var(--text-sub);">通</span>
+                <span id="inqRateHint" style="font-size:11px;color:var(--muted);">（約12秒間隔・相手サイトへの負荷軽減）</span>
               </label>
             </div>
 
@@ -2811,6 +2813,17 @@ function updateInquiryUrlCount() {
   if (el) el.textContent = urls.length + ' 件';
 }
 
+function updateInquiryRateHint() {
+  const rateEl = document.getElementById('inqRate');
+  const hintEl = document.getElementById('inqRateHint');
+  if (!rateEl || !hintEl) return;
+  let r = parseFloat(rateEl.value);
+  if (!isFinite(r) || r < 1) r = 1;
+  if (r > 60) r = 60;
+  const interval = (60 / r).toFixed(1).replace(/\.0$/, '');
+  hintEl.textContent = `（約${interval}秒間隔・相手サイトへの負荷軽減）`;
+}
+
 let inquiryLatestResults = [];
 function renderInquiryResults(results) {
   inquiryLatestResults = results;
@@ -2877,7 +2890,10 @@ async function startInquiryCampaign() {
   const template = collectInquiryTemplate();
   const urls = parseInquiryUrls();
   const dryRun = document.getElementById('inqDryRun').checked;
-  const delay = parseFloat(document.getElementById('inqDelay').value || '5');
+  const rateEl = document.getElementById('inqRate');
+  let ratePerMinute = parseFloat(rateEl ? rateEl.value : '5');
+  if (!isFinite(ratePerMinute) || ratePerMinute < 1) ratePerMinute = 5;
+  if (ratePerMinute > 60) ratePerMinute = 60;
 
   if (!urls.length) { alert('対象URLを1件以上入力してください'); return; }
   if (!dryRun) {
@@ -2906,7 +2922,7 @@ async function startInquiryCampaign() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         template, urls,
-        dry_run: dryRun, delay_seconds: delay,
+        dry_run: dryRun, rate_per_minute: ratePerMinute,
         skip_duplicates: skipDup, skip_blacklist: skipBl,
       }),
     });
@@ -3131,6 +3147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     urlsBox.addEventListener('input', updateInquiryUrlCount);
     updateInquiryUrlCount();
   }
+  updateInquiryRateHint();
   // 前回保存したテンプレートがあれば自動復元
   try {
     if (localStorage.getItem(INQUIRY_TEMPLATE_KEY)) loadInquiryTemplate();
