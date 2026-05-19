@@ -134,6 +134,16 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     """)
+    # バウンス済みメールアドレス（個別記録 + 同時にドメインをNGリストに自動登録）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inquiry_bounced_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            domain TEXT,
+            reason TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -3123,6 +3133,9 @@ def inquiry_dashboard():
     blacklist_rows = conn.execute(
         "SELECT id, domain, reason, created_at FROM inquiry_blacklist ORDER BY id DESC LIMIT 200"
     ).fetchall()
+    bounced_rows = conn.execute(
+        "SELECT id, email, domain, reason, created_at FROM inquiry_bounced_emails ORDER BY id DESC LIMIT 500"
+    ).fetchall()
     # ドメイン別統計（直近1000件から集計）
     submission_rows = conn.execute(
         "SELECT target_url, status FROM inquiry_submissions ORDER BY id DESC LIMIT 1000"
@@ -3220,6 +3233,19 @@ def inquiry_dashboard():
         bl_html += '<tr><td colspan="5" style="text-align:center;color:#5F6368;">NGドメイン未登録</td></tr>'
     bl_html += '</table>'
 
+    # バウンステーブル
+    bounce_html = '<table><tr><th>#</th><th>メール</th><th>ドメイン</th><th>理由</th><th>登録日時</th><th>操作</th></tr>'
+    if bounced_rows:
+        for r in bounced_rows:
+            bid, em, dom, reason, ca = r
+            bounce_html += (
+                f'<tr><td>{bid}</td><td>{em}</td><td>{dom or "-"}</td><td>{reason or "-"}</td><td>{ca}</td>'
+                f'<td><button onclick="deleteBounced({bid})" style="background:#fff;border:1px solid #EA4335;color:#EA4335;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px;">削除</button></td></tr>'
+            )
+    else:
+        bounce_html += '<tr><td colspan="6" style="text-align:center;color:#5F6368;">バウンス記録なし</td></tr>'
+    bounce_html += '</table>'
+
     return f"""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
 <title>フォーム営業ダッシュボード</title>
@@ -3247,6 +3273,7 @@ a{{color:#1A73E8;text-decoration:none;}}
   <div class="stat"><div class="stat-num" style="color:#34A853;">{sent_total}</div><div class="stat-label">累計成功</div></div>
   <div class="stat"><div class="stat-num" style="color:#EA4335;">{fail_total}</div><div class="stat-label">累計失敗</div></div>
   <div class="stat"><div class="stat-num" style="color:#5F6368;">{len(blacklist_rows)}</div><div class="stat-label">NGドメイン</div></div>
+  <div class="stat"><div class="stat-num" style="color:#B06000;">{len(bounced_rows)}</div><div class="stat-label">バウンス記録</div></div>
 </div>
 
 <h2>キャンペーン一覧</h2>
@@ -3267,6 +3294,18 @@ a{{color:#1A73E8;text-decoration:none;}}
   <button onclick="addBlacklistManual()">追加</button>
 </div>
 {bl_html}
+
+<h2>📮 バウンス済みメールアドレス</h2>
+<p style="font-size:.85rem;color:#5F6368;margin-bottom:.5rem;">
+  バウンスしたメールを貼り付けると、そのドメインが自動でNGリストに追加され、次回以降の送信で自動スキップされます。<br>
+  メーラーで受信したバウンス通知の本文をそのまま貼り付けてもOK（メールアドレスを自動抽出します）。
+</p>
+<textarea id="bouncedText" rows="4" placeholder="info@example.com&#10;contact@another.co.jp&#10;...またはバウンス通知メール本文をそのまま貼り付け" style="width:100%;padding:.6rem;border:1px solid #E8EAED;border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;margin-bottom:.5rem;"></textarea>
+<div class="add-form">
+  <input id="bouncedReason" placeholder="理由（任意・例: 5.1.1 user unknown）" style="flex:1;min-width:200px;">
+  <button onclick="addBouncedEmails()">バウンス登録 + NG自動追加</button>
+</div>
+{bounce_html}
 
 <script>
 async function retryCampaign(cid) {{
@@ -3304,6 +3343,29 @@ async function deleteBlacklist(bid) {{
   if (!confirm('NGドメインを削除しますか？')) return;
   try {{
     const r = await fetch('/api/inquiry/blacklist/' + bid, {{method:'DELETE'}});
+    if (!r.ok) {{ alert('削除に失敗しました'); return; }}
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function addBouncedEmails() {{
+  const text = document.getElementById('bouncedText').value.trim();
+  const reason = document.getElementById('bouncedReason').value.trim();
+  if (!text) {{ alert('バウンスしたメールアドレスを貼り付けてください'); return; }}
+  try {{
+    const r = await fetch('/api/inquiry/bounced', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{text: text, reason: reason || 'bounce'}}),
+    }});
+    const j = await r.json();
+    if (!r.ok) {{ alert('エラー: ' + (j.error || 'unknown')); return; }}
+    alert('登録しました: ' + j.added_emails + ' 件のメール / NGドメインに ' + j.added_blacklist_domains + ' 件追加（入力 ' + j.total_input + ' 件）');
+    location.reload();
+  }} catch(e) {{ alert('エラー: ' + e.message); }}
+}}
+async function deleteBounced(bid) {{
+  if (!confirm('このバウンス記録を削除しますか？（NGドメイン側は別途管理）')) return;
+  try {{
+    const r = await fetch('/api/inquiry/bounced/' + bid, {{method:'DELETE'}});
     if (!r.ok) {{ alert('削除に失敗しました'); return; }}
     location.reload();
   }} catch(e) {{ alert('エラー: ' + e.message); }}
@@ -3413,6 +3475,95 @@ def inquiry_templates_delete(tid: int):
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.execute("DELETE FROM inquiry_templates WHERE id=?", (tid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== バウンス済みメール管理 API =====
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+
+
+def _extract_emails(text: str) -> list:
+    """テキストからメールアドレスを抽出（重複除去・小文字化）"""
+    if not text:
+        return []
+    seen = set()
+    out = []
+    for m in EMAIL_RE.findall(text):
+        e = m.strip().lower()
+        if e and e not in seen:
+            seen.add(e)
+            out.append(e)
+    return out
+
+
+@app.route("/api/inquiry/bounced", methods=["GET"])
+def inquiry_bounced_list():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT id, email, domain, reason, created_at FROM inquiry_bounced_emails ORDER BY id DESC LIMIT 1000"
+    ).fetchall()
+    conn.close()
+    return jsonify({"items": [
+        {"id": r[0], "email": r[1], "domain": r[2], "reason": r[3], "created_at": r[4]} for r in rows
+    ]})
+
+
+@app.route("/api/inquiry/bounced", methods=["POST"])
+def inquiry_bounced_add():
+    """バウンス済みメールを登録（単一またはテキストから一括抽出）。
+    各ドメインを inquiry_blacklist にも自動追加（reason='bounce'）。"""
+    data = request.get_json(silent=True) or {}
+    reason = (data.get("reason") or "bounce").strip()[:200]
+    text = (data.get("text") or data.get("email") or "").strip()
+    emails = _extract_emails(text)
+    if not emails:
+        return jsonify({"error": "メールアドレスが見つかりませんでした"}), 400
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    added_emails = 0
+    added_domains = 0
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for email in emails:
+            domain = email.split("@", 1)[1] if "@" in email else ""
+            domain = domain.lower().lstrip("www.").lstrip(".")
+            # 個別メール記録
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO inquiry_bounced_emails (email, domain, reason, created_at) VALUES (?,?,?,?)",
+                (email, domain, reason, now),
+            )
+            if cur.rowcount > 0:
+                added_emails += 1
+            # ドメインを NG リストにも自動登録（既存があれば無視）
+            if domain:
+                cur2 = conn.execute(
+                    "INSERT OR IGNORE INTO inquiry_blacklist (domain, reason, created_at) VALUES (?,?,?)",
+                    (domain, f"bounce: {email}", now),
+                )
+                if cur2.rowcount > 0:
+                    added_domains += 1
+        conn.commit()
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "added_emails": added_emails,
+            "added_blacklist_domains": added_domains,
+            "total_input": len(emails),
+        })
+    except Exception as e:
+        app.logger.error(f"bounced add error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inquiry/bounced/<int:bid>", methods=["DELETE"])
+def inquiry_bounced_delete(bid: int):
+    """バウンス記録のみ削除（NGリスト側は手動管理に任せる）"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM inquiry_bounced_emails WHERE id=?", (bid,))
         conn.commit()
         conn.close()
         return jsonify({"ok": True})
