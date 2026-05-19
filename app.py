@@ -3849,6 +3849,87 @@ def email_cancel(job_id: str):
     return jsonify({"ok": True})
 
 
+@app.route("/api/email/extract-pending", methods=["POST"])
+def email_extract_pending():
+    """Mail Sales GiveFast 等の一覧表を貼り付け、未送信(pending)のメアドだけを抽出。
+    入力: { text: "..." }
+    出力: { pending: [...], counts: {sent, unsubscribed, pending, unknown},
+            csv: "...", tsv: "..." }
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "テキストを貼り付けてください"}), 400
+
+    SENT_KEYWORDS = ["sent", "delivered", "送信済", "配信済", "opened", " open "]
+    UNSUB_KEYWORDS = ["unsubscribed", "unsub", "配信停止", "拒否", "オプトアウト", "解除"]
+    PENDING_KEYWORDS = ["pending", "queued", "未送信", "待機", "draft"]
+    FAILED_KEYWORDS = ["failed", "bounce", "失敗", "エラー", "bounced"]
+
+    def _parse_variables(line: str, email: str) -> dict:
+        """変数列を解析: '名前=...', '役職=...', 'メモ=...' を抽出"""
+        out = {"name": "", "title": "", "memo": ""}
+        # email より後ろの部分を変数候補とする
+        idx = line.find(email)
+        tail = line[idx + len(email):] if idx >= 0 else line
+        for m in re.finditer(r"(名前|お名前|氏名|name)\s*[=：:]\s*([^,\t\n、]+)", tail, re.IGNORECASE):
+            out["name"] = m.group(2).strip()
+            break
+        for m in re.finditer(r"(役職|役職名|肩書|title)\s*[=：:]\s*([^,\t\n、]+)", tail, re.IGNORECASE):
+            out["title"] = m.group(2).strip()
+            break
+        for m in re.finditer(r"(メモ|備考|note|memo)\s*[=：:]\s*([^,\t\n、]+)", tail, re.IGNORECASE):
+            out["memo"] = m.group(2).strip()
+            break
+        return out
+
+    pending_rows = []
+    counts = {"sent": 0, "unsubscribed": 0, "pending": 0, "unknown": 0, "failed": 0}
+    seen_emails = set()
+    for line in text.splitlines():
+        line_lower = " " + line.lower() + " "
+        emails_in_line = EMAIL_RE.findall(line)
+        for email in emails_in_line:
+            email = email.strip().lower()
+            if email in seen_emails:
+                continue
+            seen_emails.add(email)
+            if any(kw in line_lower for kw in UNSUB_KEYWORDS):
+                counts["unsubscribed"] += 1
+            elif any(kw in line_lower for kw in SENT_KEYWORDS):
+                counts["sent"] += 1
+            elif any(kw in line_lower for kw in FAILED_KEYWORDS):
+                counts["failed"] += 1
+            elif any(kw in line_lower for kw in PENDING_KEYWORDS):
+                counts["pending"] += 1
+                vars = _parse_variables(line, email)
+                pending_rows.append({"email": email, **vars})
+            else:
+                # ステータス未検出 → 未送信扱い（保守的: スキップしない）
+                counts["unknown"] += 1
+                vars = _parse_variables(line, email)
+                pending_rows.append({"email": email, **vars})
+
+    # CSV/TSV 生成
+    import csv as _csv
+    from io import StringIO
+    def _build(delim):
+        buf = StringIO()
+        w = _csv.writer(buf, delimiter=delim, lineterminator="\n")
+        w.writerow(["email", "name", "title", "memo"])
+        for r in pending_rows:
+            w.writerow([r["email"], r["name"], r["title"], r["memo"]])
+        return buf.getvalue()
+
+    return jsonify({
+        "pending": pending_rows,
+        "counts": counts,
+        "csv": _build(","),
+        "tsv": _build("\t"),
+        "total_pending": len(pending_rows),
+    })
+
+
 @app.route("/api/email/exclude/import", methods=["POST"])
 def email_exclude_import():
     """外部ツール（Mail Sales GiveFast 等）の送信済み一覧を取込み、除外リストに登録。
