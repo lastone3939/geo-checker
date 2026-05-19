@@ -5,3 +5,5 @@ __pycache__/
 venv/
 *.egg-info/
 .venv/
+*.db.test
+geo_logs.db.test
