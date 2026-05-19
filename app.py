@@ -144,6 +144,40 @@ def init_db():
             created_at TEXT NOT NULL
         )
     """)
+    # メール一括送信キャンペーン
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT UNIQUE,
+            subject TEXT,
+            body TEXT,
+            from_name TEXT,
+            from_email TEXT,
+            total INTEGER DEFAULT 0,
+            success_count INTEGER DEFAULT 0,
+            failure_count INTEGER DEFAULT 0,
+            skipped_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            allow_resend INTEGER DEFAULT 0,
+            ip TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    # メール送信履歴（重複防止 + 個別結果）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_sent_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER,
+            to_email TEXT NOT NULL,
+            status TEXT,
+            error_message TEXT,
+            sent_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_email_sent_log_email ON email_sent_log(to_email)")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -3482,7 +3516,12 @@ def inquiry_templates_delete(tid: int):
         return jsonify({"error": str(e)}), 500
 
 
-# ===== バウンス済みメール管理 API =====
+# ===================================================================
+# メール一括送信エンジン
+# ===================================================================
+
+EMAIL_JOBS = {}  # job_id -> {status, progress, total, results, error, created_at}
+
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 
@@ -3500,6 +3539,333 @@ def _extract_emails(text: str) -> list:
     return out
 
 
+def _merge_template_vars(text: str, row: dict) -> str:
+    """{{name}} などの差込変数を置換"""
+    if not text:
+        return ""
+    def _sub(m):
+        key = m.group(1).strip().lower()
+        return str(row.get(key, "") or "")
+    return re.sub(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}", _sub, text)
+
+
+def _send_email_smtp(to_email: str, subject: str, body: str, from_name: str, from_email: str, timeout: int = 30) -> tuple:
+    """SMTPでメール1通を送信。(ok, error_message) を返す"""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.header import Header
+    from email.utils import formataddr, make_msgid
+
+    if not SMTP_PASS:
+        return False, "SMTP_PASS が未設定です（環境変数を設定してください）"
+    sender = from_email or SMTP_FROM
+    display = from_name or sender
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = Header(subject or "", "utf-8")
+    msg["From"] = formataddr((str(Header(display, "utf-8")), sender))
+    msg["To"] = to_email
+    msg["Message-ID"] = make_msgid(domain=sender.split("@", 1)[-1] if "@" in sender else "localhost")
+    msg.attach(MIMEText(body or "", "plain", "utf-8"))
+    try:
+        if int(SMTP_PORT) == 465:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=timeout)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=timeout)
+            try:
+                server.starttls()
+            except Exception:
+                pass
+        try:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(sender, [to_email], msg.as_string())
+        finally:
+            try:
+                server.quit()
+            except Exception:
+                pass
+        return True, None
+    except smtplib.SMTPRecipientsRefused as e:
+        return False, f"宛先拒否: {e}"
+    except smtplib.SMTPSenderRefused as e:
+        return False, f"送信元拒否: {e}"
+    except smtplib.SMTPDataError as e:
+        return False, f"SMTPデータエラー: {e.smtp_code} {e.smtp_error}"
+    except smtplib.SMTPException as e:
+        return False, f"SMTPエラー: {e}"
+    except Exception as e:
+        return False, f"送信失敗: {e}"
+
+
+def _load_blacklist_emails_and_domains() -> tuple:
+    """NGドメインとバウンスメールの集合を返す"""
+    domains = set()
+    emails = set()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for r in conn.execute("SELECT domain FROM inquiry_blacklist").fetchall():
+            if r[0]:
+                domains.add(r[0].strip().lower())
+        for r in conn.execute("SELECT email FROM inquiry_bounced_emails").fetchall():
+            if r[0]:
+                emails.add(r[0].strip().lower())
+        conn.close()
+    except Exception:
+        pass
+    return domains, emails
+
+
+def _load_already_sent_emails() -> set:
+    """過去にsent成功したメールアドレス"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT to_email FROM email_sent_log WHERE status='sent'"
+        ).fetchall()
+        conn.close()
+        return {r[0].strip().lower() for r in rows if r[0]}
+    except Exception:
+        return set()
+
+
+def run_email_job(job_id: str, recipients: list, subject_tpl: str, body_tpl: str,
+                  from_name: str, from_email: str, rate_per_minute: float,
+                  allow_resend: bool, skip_bounce: bool, ip: str = ""):
+    """メール一括送信ジョブ。recipients は [{email, name?, company?, ...}, ...]"""
+    try:
+        EMAIL_JOBS[job_id]["status"] = "running"
+        delay = max(0.0, 60.0 / max(1.0, min(rate_per_minute, 600.0)))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO email_campaigns (job_id, subject, body, from_name, from_email, total, status, allow_resend, ip, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (job_id, subject_tpl, body_tpl, from_name, from_email, len(recipients), "running", 1 if allow_resend else 0, ip, now),
+        )
+        conn.commit()
+        campaign_id = conn.execute("SELECT id FROM email_campaigns WHERE job_id=?", (job_id,)).fetchone()[0]
+        conn.close()
+
+        ng_domains, bounced = _load_blacklist_emails_and_domains() if skip_bounce else (set(), set())
+        already_sent = set() if allow_resend else _load_already_sent_emails()
+
+        success = 0
+        failure = 0
+        skipped = 0
+        for idx, row in enumerate(recipients):
+            if EMAIL_JOBS.get(job_id, {}).get("cancel"):
+                break
+            email = (row.get("email") or "").strip().lower()
+            if not email or "@" not in email:
+                res = {"email": email, "status": "failed", "error": "不正なメールアドレス"}
+                failure += 1
+            else:
+                domain = email.split("@", 1)[1]
+                if skip_bounce and email in bounced:
+                    res = {"email": email, "status": "skipped_bounce", "error": "バウンス済みアドレス"}
+                    skipped += 1
+                elif skip_bounce and domain in ng_domains:
+                    res = {"email": email, "status": "skipped_blacklist", "error": f"NGドメイン: {domain}"}
+                    skipped += 1
+                elif (not allow_resend) and email in already_sent:
+                    res = {"email": email, "status": "skipped_duplicate", "error": "過去に送信済み"}
+                    skipped += 1
+                else:
+                    subject = _merge_template_vars(subject_tpl, row)
+                    body = _merge_template_vars(body_tpl, row)
+                    ok, err = _send_email_smtp(email, subject, body, from_name, from_email)
+                    if ok:
+                        res = {"email": email, "status": "sent", "error": None}
+                        success += 1
+                        already_sent.add(email)
+                    else:
+                        res = {"email": email, "status": "failed", "error": err}
+                        failure += 1
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "INSERT INTO email_sent_log (campaign_id, to_email, status, error_message, sent_at) VALUES (?,?,?,?,?)",
+                    (campaign_id, email, res["status"], res.get("error"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            EMAIL_JOBS[job_id]["results"].append(res)
+            EMAIL_JOBS[job_id]["progress"] = idx + 1
+
+            # スキップ時は待機しない（送信していないので負荷ゼロ）
+            was_skipped = res["status"].startswith("skipped") or res["status"] == "failed" and "不正" in (res.get("error") or "")
+            if idx < len(recipients) - 1 and delay > 0 and not was_skipped:
+                time.sleep(delay)
+
+        EMAIL_JOBS[job_id]["status"] = "done"
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "UPDATE email_campaigns SET success_count=?, failure_count=?, skipped_count=?, status=? WHERE id=?",
+                (success, failure, skipped, "done", campaign_id),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+    except Exception as e:
+        EMAIL_JOBS[job_id]["status"] = "error"
+        EMAIL_JOBS[job_id]["error"] = str(e)
+        app.logger.error(f"email job error: {e}")
+
+
+def _parse_recipients(raw) -> list:
+    """テキストまたは配列を [{email, name, company, ...}, ...] に正規化"""
+    rows = []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str):
+                emails = _extract_emails(item)
+                for e in emails:
+                    rows.append({"email": e})
+            elif isinstance(item, dict):
+                e = (item.get("email") or "").strip().lower()
+                if e and "@" in e:
+                    rows.append({**item, "email": e})
+    elif isinstance(raw, str):
+        # 行ごとにCSV風にパース: email,name,company...
+        import csv
+        from io import StringIO
+        reader = csv.reader(StringIO(raw))
+        header = None
+        for row in reader:
+            if not row:
+                continue
+            cells = [c.strip() for c in row]
+            # ヘッダー行検出: セルの値がそのまま列名相当（"email"/"name"等の単語のみ）
+            HEADER_TOKENS = {"email", "mail", "e-mail", "メール", "メールアドレス",
+                             "name", "氏名", "お名前", "名前", "company", "会社名", "会社"}
+            if header is None and any(c.lower().strip() in HEADER_TOKENS for c in cells):
+                # かつ、どのセルにも実際のメアドが含まれていないこと
+                if not any(EMAIL_RE.search(c) for c in cells):
+                    header = [c.lower() for c in cells]
+                    continue
+            # email を探す
+            email = ""
+            other = {}
+            for i, c in enumerate(cells):
+                m = EMAIL_RE.search(c)
+                if m and not email:
+                    email = m.group(0).strip().lower()
+                if header and i < len(header):
+                    other[header[i]] = c
+            if email:
+                if header:
+                    other["email"] = email
+                    rows.append(other)
+                else:
+                    # ヘッダー無しの場合：先頭以外を name/company にする
+                    entry = {"email": email}
+                    for i, c in enumerate(cells):
+                        if c == email or EMAIL_RE.search(c):
+                            continue
+                        if i == 1 or "name" not in entry:
+                            entry["name"] = c
+                        elif "company" not in entry:
+                            entry["company"] = c
+                    rows.append(entry)
+    # 重複排除（email単位、最後の出現を優先）
+    dedup = {}
+    for r in rows:
+        dedup[r["email"]] = r
+    return list(dedup.values())
+
+
+@app.route("/api/email/send", methods=["POST"])
+@limiter.limit("3 per minute;20 per hour;500 per day")
+def email_send():
+    """メール一括送信を開始（バックグラウンド）"""
+    if not SMTP_PASS:
+        return jsonify({"error": "SMTP_PASS 環境変数が未設定です。運用環境に設定してください。"}), 503
+    data = request.get_json(silent=True) or {}
+    subject = (data.get("subject") or "").strip()
+    body = (data.get("body") or "").strip()
+    from_name = (data.get("from_name") or "").strip()[:100]
+    from_email = (data.get("from_email") or SMTP_FROM).strip()
+    try:
+        rate = float(data.get("rate_per_minute") or 5)
+    except Exception:
+        rate = 5.0
+    rate = max(1.0, min(rate, 60.0))
+    allow_resend = bool(data.get("allow_resend", False))
+    skip_bounce = bool(data.get("skip_bounce", True))
+
+    recipients_raw = data.get("recipients")
+    if recipients_raw is None:
+        recipients_raw = data.get("text") or ""
+    recipients = _parse_recipients(recipients_raw)
+    if not recipients:
+        return jsonify({"error": "送信先メールアドレスが見つかりませんでした"}), 400
+    if len(recipients) > 1000:
+        return jsonify({"error": "一度に送れるのは1000件までです"}), 400
+    if not subject:
+        return jsonify({"error": "件名を入力してください"}), 400
+    if not body:
+        return jsonify({"error": "本文を入力してください"}), 400
+
+    job_id = str(uuid.uuid4())
+    EMAIL_JOBS[job_id] = {
+        "status": "queued", "progress": 0, "total": len(recipients),
+        "results": [], "error": None,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    ip = get_remote_address()
+    threading.Thread(
+        target=run_email_job,
+        args=(job_id, recipients, subject, body, from_name, from_email, rate, allow_resend, skip_bounce, ip),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id, "total": len(recipients)})
+
+
+@app.route("/api/email/status/<job_id>")
+def email_status(job_id: str):
+    job = EMAIL_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify({
+        "status": job["status"],
+        "progress": job["progress"],
+        "total": job["total"],
+        "results": job["results"][-200:],  # 直近200件のみ
+        "error": job.get("error"),
+    })
+
+
+@app.route("/api/email/cancel/<job_id>", methods=["POST"])
+def email_cancel(job_id: str):
+    job = EMAIL_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    job["cancel"] = True
+    return jsonify({"ok": True})
+
+
+@app.route("/api/email/preview", methods=["POST"])
+def email_preview():
+    """差込変数を適用したサンプルを返す"""
+    data = request.get_json(silent=True) or {}
+    subject = data.get("subject") or ""
+    body = data.get("body") or ""
+    recipients = _parse_recipients(data.get("recipients") or data.get("text") or "")
+    sample_row = recipients[0] if recipients else {"email": "sample@example.com"}
+    return jsonify({
+        "subject": _merge_template_vars(subject, sample_row),
+        "body": _merge_template_vars(body, sample_row),
+        "total_recipients": len(recipients),
+        "sample_row": sample_row,
+    })
+
+
+# ===== バウンス済みメール管理 API =====
 @app.route("/api/inquiry/bounced", methods=["GET"])
 def inquiry_bounced_list():
     conn = sqlite3.connect(DB_PATH)

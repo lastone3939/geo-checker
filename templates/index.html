@@ -833,6 +833,7 @@
           <button class="tab-btn" data-tab="chat">💬 チャット</button>
           <button class="tab-btn" data-tab="video">🎬 動画</button>
           <button class="tab-btn" data-tab="inquiry">📬 フォーム営業</button>
+          <button class="tab-btn" data-tab="email">✉️ メール送信</button>
         </div>
 
         <div id="tabWeb" class="tab-content active">
@@ -1269,6 +1270,127 @@
             <p style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.6;">
               ※ 相手サイトのrobots.txt/利用規約を尊重し、過度な連投は避けてください。本ツールはCAPTCHA設置フォームをスキップします。<br>
               ※ 全キャンペーンの履歴・失敗再実行・CSV出力は <code>/inquiry/dashboard?token=ADMIN_TOKEN</code> から確認できます。
+            </p>
+          </div>
+        </div>
+
+        <div id="tabEmail" class="tab-content">
+          <div style="padding-top:20px;">
+            <div style="text-align:center;margin-bottom:16px;">
+              <p style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;">
+                メール一括送信（SMTP経由）
+              </p>
+              <p style="font-size:13px;color:var(--text-sub);">
+                メールアドレスリスト + 件名/本文を入力するだけ。差込変数（{{name}} 等）対応・重複制御切替可。
+              </p>
+            </div>
+
+            <!-- 差出人 -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">① 差出人情報</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);">
+                  差出人名（表示名）
+                  <input type="text" id="emFromName" class="inq-input" placeholder="清水 望（株式会社ZETTAI）">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);">
+                  差出人アドレス
+                  <input type="email" id="emFromEmail" class="inq-input" placeholder="（空欄なら環境変数のSMTP_FROMを使用）">
+                </label>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">
+                ※ 実際の送信は SMTP_FROM 環境変数で設定されたアカウントから行われます。<br>
+                ※ 一部メールサーバーは別ドメインからの送信を拒否するため、表示名のみカスタマイズ推奨。
+              </p>
+            </div>
+
+            <!-- 件名・本文 -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">② 件名・本文</p>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+                件名 <span style="color:#EA4335;">*</span>
+                <input type="text" id="emSubject" class="inq-input" placeholder="例: AI検索対策（GEO）のご提案">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-sub);">
+                本文 <span style="color:#EA4335;">*</span>
+                <textarea id="emBody" rows="10" class="inq-input" placeholder="{{name}} 様&#10;&#10;突然のご連絡失礼いたします。株式会社ZETTAIの清水と申します。&#10;..."></textarea>
+              </label>
+              <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+                差込変数: <code>{{email}}</code> <code>{{name}}</code> <code>{{company}}</code> 等（CSVヘッダー列名と一致）
+              </p>
+              <button type="button" onclick="previewEmail()" style="margin-top:8px;padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-sub);">👁 1件目でプレビュー</button>
+            </div>
+
+            <!-- 送信先 -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+                <p style="font-size:13px;font-weight:700;color:var(--text);margin:0;">③ 送信先（最大1000件）</p>
+                <label style="padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text-sub);">
+                  📂 CSV読込
+                  <input type="file" id="emCsvFile" accept=".csv,.txt" style="display:none;" onchange="loadEmailCsv(event)">
+                </label>
+              </div>
+              <textarea id="emRecipients" rows="8" class="inq-input" placeholder="email,name,company&#10;info@example.com,山田太郎,株式会社A&#10;contact@another.co.jp,鈴木花子,株式会社B&#10;&#10;または1行1メアド:&#10;info@example.com&#10;contact@another.co.jp"></textarea>
+              <div id="emRecipientCount" style="font-size:11px;color:var(--muted);margin-top:6px;">0 件</div>
+            </div>
+
+            <!-- オプション -->
+            <div style="background:#F8F9FA;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">④ オプション</p>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" id="emAllowResend">
+                <span>過去送信済みのアドレスにも送る（重複防止をOFF）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer;">
+                <input type="checkbox" id="emSkipBounce" checked>
+                <span>バウンス済み/NGドメインを自動スキップ</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex-wrap:wrap;">
+                送信レート
+                <span style="font-size:12px;color:var(--text-sub);">1分間に</span>
+                <input type="number" id="emRate" value="5" min="1" max="60" step="1" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;" oninput="updateEmailRateHint()">
+                <span style="font-size:12px;color:var(--text-sub);">通</span>
+                <span id="emRateHint" style="font-size:11px;color:var(--muted);">（約12秒間隔）</span>
+              </label>
+            </div>
+
+            <button type="button" id="emSubmitBtn" onclick="startEmailCampaign()" class="submit-btn" style="width:100%;padding:14px;font-size:15px;">
+              ✉️ 一括送信スタート
+            </button>
+
+            <!-- 進捗 -->
+            <div id="emProgressArea" style="display:none;margin-top:16px;padding:16px;background:#F8F9FA;border-radius:12px;border:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div style="width:18px;height:18px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <span id="emProgressText" style="font-size:14px;font-weight:600;">処理中...</span>
+                <button type="button" onclick="cancelEmailCampaign()" style="margin-left:auto;padding:4px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;">中止</button>
+              </div>
+              <div style="background:#E8EAED;border-radius:4px;height:6px;overflow:hidden;">
+                <div id="emProgressBar" style="height:100%;background:var(--primary);border-radius:4px;width:0%;transition:width 0.3s ease;"></div>
+              </div>
+            </div>
+
+            <!-- サマリー -->
+            <div id="emSummary" style="display:none;margin-top:14px;padding:12px;background:#E8F0FE;border:1px solid #1A73E8;border-radius:10px;font-size:13px;color:#174EA6;"></div>
+
+            <!-- 結果テーブル -->
+            <div id="emResultWrap" style="display:none;margin-top:14px;max-height:400px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#F1F3F4;position:sticky;top:0;">
+                    <th style="text-align:left;padding:8px;border:1px solid var(--border);">メールアドレス</th>
+                    <th style="padding:8px;border:1px solid var(--border);width:120px;">ステータス</th>
+                    <th style="padding:8px;border:1px solid var(--border);">エラー</th>
+                  </tr>
+                </thead>
+                <tbody id="emResultBody"></tbody>
+              </table>
+            </div>
+
+            <p style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.6;">
+              ※ 短時間に大量送信するとSMTPプロバイダ側でレート制限される可能性があります。<br>
+              ※ 同一アドレスへの再送はスパム判定リスクを高めます。件名・本文を変える等の工夫を推奨。<br>
+              ※ デフォルトでは過去送信成功アドレスを自動スキップします（再送する場合は④で「重複防止をOFF」をチェック）。
             </p>
           </div>
         </div>
@@ -1844,7 +1966,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
   if (btn) btn.classList.add('active');
-  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo', inquiry: 'tabInquiry' };
+  const tabIds = { web: 'tabWeb', gbp: 'tabGbp', chat: 'tabChat', video: 'tabVideo', inquiry: 'tabInquiry', email: 'tabEmail' };
   const tabEl = document.getElementById(tabIds[tab] || 'tabWeb');
   if (tabEl) tabEl.classList.add('active');
 
@@ -3039,6 +3161,184 @@ function loadInquiryUrlsCsv(event) {
   reader.readAsText(file, 'UTF-8');
 }
 
+// ===== メール一括送信 =====
+let emailJobId = null;
+let emailPollTimer = null;
+
+function parseEmailRecipients() {
+  return (document.getElementById('emRecipients').value || '').trim();
+}
+function countEmailRecipientsRoughly() {
+  const text = parseEmailRecipients();
+  const matches = text.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g);
+  return matches ? new Set(matches.map(s => s.toLowerCase())).size : 0;
+}
+function updateEmailRecipientCount() {
+  const el = document.getElementById('emRecipientCount');
+  if (el) el.textContent = countEmailRecipientsRoughly() + ' 件（メアド検出数）';
+}
+function updateEmailRateHint() {
+  const rateEl = document.getElementById('emRate');
+  const hintEl = document.getElementById('emRateHint');
+  if (!rateEl || !hintEl) return;
+  let r = parseFloat(rateEl.value);
+  if (!isFinite(r) || r < 1) r = 1;
+  if (r > 60) r = 60;
+  const interval = (60 / r).toFixed(1).replace(/\.0$/, '');
+  hintEl.textContent = `（約${interval}秒間隔）`;
+}
+
+function loadEmailCsv(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const ta = document.getElementById('emRecipients');
+    const existing = (ta.value || '').trim();
+    const newText = String(e.target.result || '');
+    ta.value = existing ? (existing + '\n' + newText) : newText;
+    updateEmailRecipientCount();
+    event.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function previewEmail() {
+  const subject = (document.getElementById('emSubject').value || '').trim();
+  const body = (document.getElementById('emBody').value || '').trim();
+  const text = parseEmailRecipients();
+  if (!subject && !body) { alert('件名・本文を入力してください'); return; }
+  try {
+    const r = await fetch('/api/email/preview', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({subject, body, text}),
+    });
+    const j = await r.json();
+    const sample = j.sample_row || {};
+    const sampleLines = Object.entries(sample).map(([k,v]) => `  ${k} = ${v}`).join('\n');
+    alert(
+      '【プレビュー（1件目のデータで差込）】\n' +
+      '宛先: ' + (sample.email || '(なし)') + '\n' +
+      '差込データ:\n' + sampleLines + '\n' +
+      '─────────\n' +
+      '件名: ' + j.subject + '\n\n' +
+      j.body + '\n\n' +
+      '─────────\n' +
+      '対象件数: ' + j.total_recipients + ' 件'
+    );
+  } catch (e) { alert('プレビュー失敗: ' + e.message); }
+}
+
+async function startEmailCampaign() {
+  const subject = (document.getElementById('emSubject').value || '').trim();
+  const body = (document.getElementById('emBody').value || '').trim();
+  const text = parseEmailRecipients();
+  const fromName = (document.getElementById('emFromName').value || '').trim();
+  const fromEmail = (document.getElementById('emFromEmail').value || '').trim();
+  let rate = parseFloat(document.getElementById('emRate').value || '5');
+  if (!isFinite(rate) || rate < 1) rate = 5;
+  if (rate > 60) rate = 60;
+  const allowResend = document.getElementById('emAllowResend').checked;
+  const skipBounce = document.getElementById('emSkipBounce').checked;
+  if (!subject) { alert('件名を入力してください'); return; }
+  if (!body) { alert('本文を入力してください'); return; }
+  const count = countEmailRecipientsRoughly();
+  if (!count) { alert('送信先メールアドレスを入力してください'); return; }
+  if (!confirm(`${count} 件のメールを実際に送信します（${rate} 通/分）。よろしいですか？`)) return;
+  if (allowResend && !confirm('「重複防止OFF」が有効です。過去送信成功したアドレスにも再送されます。本当に進めますか？')) return;
+
+  const btn = document.getElementById('emSubmitBtn');
+  btn.disabled = true;
+  document.getElementById('emProgressArea').style.display = 'block';
+  document.getElementById('emProgressText').textContent = '送信開始中...';
+  document.getElementById('emProgressBar').style.width = '0%';
+  document.getElementById('emSummary').style.display = 'none';
+  document.getElementById('emResultBody').innerHTML = '';
+  document.getElementById('emResultWrap').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/email/send', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        subject, body, text,
+        from_name: fromName, from_email: fromEmail,
+        rate_per_minute: rate,
+        allow_resend: allowResend, skip_bounce: skipBounce,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '開始に失敗');
+    emailJobId = data.job_id;
+    pollEmailStatus();
+  } catch (e) {
+    alert('エラー: ' + e.message);
+    btn.disabled = false;
+    document.getElementById('emProgressArea').style.display = 'none';
+  }
+}
+
+async function pollEmailStatus() {
+  if (!emailJobId) return;
+  try {
+    const r = await fetch('/api/email/status/' + emailJobId);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'ステータス取得失敗');
+    const pct = data.total > 0 ? Math.round((data.progress / data.total) * 100) : 0;
+    document.getElementById('emProgressBar').style.width = pct + '%';
+    document.getElementById('emProgressText').textContent = `処理中... ${data.progress} / ${data.total} 件 (${pct}%)`;
+    renderEmailResults(data.results || []);
+    if (data.status === 'done' || data.status === 'error') {
+      clearTimeout(emailPollTimer);
+      document.getElementById('emSubmitBtn').disabled = false;
+      document.getElementById('emProgressArea').style.display = 'none';
+      const results = data.results || [];
+      const counts = {};
+      results.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+      const parts = Object.entries(counts).map(([k,v]) => `${k}: ${v}`);
+      const sum = document.getElementById('emSummary');
+      sum.style.display = 'block';
+      sum.innerHTML = `✨ 処理完了（合計 ${data.total} 件処理）— ${parts.join(' / ')}`;
+      emailJobId = null;
+    } else {
+      emailPollTimer = setTimeout(pollEmailStatus, 2000);
+    }
+  } catch (e) {
+    document.getElementById('emProgressText').textContent = 'エラー: ' + e.message;
+    document.getElementById('emSubmitBtn').disabled = false;
+  }
+}
+
+function renderEmailResults(results) {
+  const body = document.getElementById('emResultBody');
+  const wrap = document.getElementById('emResultWrap');
+  if (!body || !wrap) return;
+  if (!results.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const labelMap = {
+    sent: '✅ 送信', failed: '❌ 失敗',
+    skipped_duplicate: '🔁 既送信', skipped_blacklist: '🚫 NG', skipped_bounce: '📮 バウンス済',
+  };
+  const colorMap = {
+    sent: '#34A853', failed: '#EA4335',
+    skipped_duplicate: '#5F6368', skipped_blacklist: '#5F6368', skipped_bounce: '#B06000',
+  };
+  body.innerHTML = results.map(r => {
+    const label = labelMap[r.status] || r.status;
+    const color = colorMap[r.status] || '#5F6368';
+    return `<tr>
+      <td style="padding:6px;border:1px solid var(--border);word-break:break-all;">${escapeHtml(r.email)}</td>
+      <td style="padding:6px;border:1px solid var(--border);text-align:center;color:${color};font-weight:700;">${label}</td>
+      <td style="padding:6px;border:1px solid var(--border);color:#C5221F;font-size:11px;">${escapeHtml(r.error || '')}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function cancelEmailCampaign() {
+  if (!emailJobId) return;
+  if (!confirm('このメールキャンペーンを中止しますか？')) return;
+  try { await fetch('/api/email/cancel/' + emailJobId, {method:'POST'}); } catch (e) {}
+}
+
 // バウンスメール登録
 function openBouncedModal() {
   document.getElementById('bouncedModal').style.display = 'flex';
@@ -3204,6 +3504,13 @@ document.addEventListener('DOMContentLoaded', function() {
     updateInquiryUrlCount();
   }
   updateInquiryRateHint();
+  // メール送信タブの初期化
+  const emBox = document.getElementById('emRecipients');
+  if (emBox) {
+    emBox.addEventListener('input', updateEmailRecipientCount);
+    updateEmailRecipientCount();
+  }
+  updateEmailRateHint();
   // 前回保存したテンプレートがあれば自動復元
   try {
     if (localStorage.getItem(INQUIRY_TEMPLATE_KEY)) loadInquiryTemplate();
